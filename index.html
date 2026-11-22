@@ -140,8 +140,12 @@ https://raw.githubusercontent.com/user/repo/main/README.md"></textarea>
   </div>
   <div class="row">
     <label>GitHub Repository URL</label>
-    <input type="text" id="repoUrl" placeholder="https://github.com/owner/repo">
-    <div class="hint">Enter a public GitHub repo root. Files listed via API, fetched via raw URLs.</div>
+    <input type="text" id="repoUrl" placeholder="https://github.com/owner/repo or .../tree/v1.0.0 or .../archive/refs/tags/v1.0.0">
+    <div class="hint">
+      Supports: repo root, <code>/tree/branch</code>, <code>/tree/tag</code>, <code>/commit/sha</code>,
+      <code>/archive/refs/tags/v1.0.0</code>, <code>/archive/refs/heads/main</code>.
+      Files listed via API, fetched via raw URLs.
+    </div>
   </div>
   <div class="controls row">
     <label>Max file size (KB): <input type="number" id="maxKb" value="500" min="1"></label>
@@ -357,10 +361,55 @@ document.getElementById('mergeUrlsBtn').onclick = async () => {
 document.getElementById('loadRepoBtn').onclick = async () => {
   clearStatus();
   const repoInput = document.getElementById('repoUrl').value.trim();
-  const m = repoInput.match(/github\.com\/([^/]+)\/([^/]+)\/?$/);
-  if (!m) return showStatus('Invalid GitHub repo URL. Use https://github.com/owner/repo', 'error');
+  if (!repoInput) return showStatus('Enter a GitHub repository URL.', 'error');
 
-  const [, owner, repo] = m;
+  // Parse various GitHub URL formats:
+  // - https://github.com/owner/repo
+  // - https://github.com/owner/repo/tree/v1.0.0
+  // - https://github.com/owner/repo/tree/main
+  // - https://github.com/owner/repo/commit/abc123
+  // - https://github.com/owner/repo/archive/refs/tags/v1.0.0
+  // - https://github.com/owner/repo/archive/refs/heads/main
+  // - https://github.com/owner/repo/releases/tag/v1.0.0
+
+  let owner, repo, ref = null, isCommit = false;
+
+  try {
+    const url = new URL(repoInput);
+    if (url.hostname !== 'github.com') throw new Error('Not a GitHub URL');
+
+    const parts = url.pathname.split('/').filter(Boolean);
+    if (parts.length < 2) throw new Error('Invalid GitHub URL');
+
+    owner = parts[0];
+    repo = parts[1].replace(/\.git$/, '');
+
+    // Handle /tree/<ref>
+    if (parts[2] === 'tree' && parts[3]) {
+      ref = parts[3];
+    }
+    // Handle /commit/<sha>
+    else if (parts[2] === 'commit' && parts[3]) {
+      ref = parts[3];
+      isCommit = true;
+    }
+    // Handle /archive/refs/tags/<tag> or /archive/refs/heads/<branch>
+    else if (parts[2] === 'archive' && parts[3] === 'refs') {
+      if (parts[4] === 'tags' && parts[5]) ref = parts[5];
+      else if (parts[4] === 'heads' && parts[5]) ref = parts[5];
+    }
+    // Handle /releases/tag/<tag>
+    else if (parts[2] === 'releases' && parts[3] === 'tag' && parts[4]) {
+      ref = parts[4];
+    }
+    // Handle /tags/<tag>
+    else if (parts[2] === 'tags' && parts[3]) {
+      ref = parts[3];
+    }
+  } catch (e) {
+    return showStatus('Invalid GitHub URL. Use https://github.com/owner/repo[/tree/ref]', 'error');
+  }
+
   const maxKb = parseInt(document.getElementById('maxKb').value) || 500;
   const maxBytes = maxKb * 1024;
   const skipBin = document.getElementById('skipBinaries').checked;
@@ -369,20 +418,29 @@ document.getElementById('loadRepoBtn').onclick = async () => {
   fileListEl.innerHTML = '';
 
   try {
+    // Get repo metadata
     const metaRes = await fetchWithTimeout(`https://api.github.com/repos/${owner}/${repo}`, 10000);
     if (!metaRes.ok) throw Object.assign(new Error(`Repo API ${metaRes.status}`), { status: metaRes.status });
     const meta = await metaRes.json();
-    const branch = meta.default_branch;
 
-    showStatus('Fetching file tree…', 'loading');
-    const treeRes = await fetchWithTimeout(`https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`, 15000);
+    // If no ref specified, use default branch
+    if (!ref) ref = meta.default_branch;
+
+    // For commit SHAs, verify it exists
+    if (isCommit) {
+      const commitRes = await fetchWithTimeout(`https://api.github.com/repos/${owner}/${repo}/commits/${ref}`, 10000);
+      if (!commitRes.ok) throw Object.assign(new Error(`Commit not found: ${ref}`), { status: commitRes.status });
+    }
+
+    showStatus(`Fetching file tree for ref: ${ref}…`, 'loading');
+    const treeRes = await fetchWithTimeout(`https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(ref)}?recursive=1`, 15000);
     if (!treeRes.ok) throw Object.assign(new Error(`Tree API ${treeRes.status}`), { status: treeRes.status });
     const tree = await treeRes.json();
     if (tree.truncated) showStatus('⚠️ Repo truncated — some files omitted.', 'error');
 
     repoFiles = (tree.tree || []).filter(n => n.type === 'blob').map(n => ({
       path: n.path,
-      raw: `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${encodeURI(n.path)}`,
+      raw: `https://raw.githubusercontent.com/${owner}/${repo}/${encodeURIComponent(ref)}/${encodeURI(n.path)}`,
       size: n.size,
       isBinary: isBinaryPath(n.path)
     })).filter(n => !skipBin || !n.isBinary).filter(n => (n.size ?? 0) <= maxBytes);
@@ -391,7 +449,7 @@ document.getElementById('loadRepoBtn').onclick = async () => {
     renderFileList();
     document.getElementById('selectActions').style.display = 'block';
     document.getElementById('mergeRepoRow').style.display = 'block';
-    showStatus(`✅ Found ${repoFiles.length} file(s). Select and merge.`, 'success');
+    showStatus(`✅ Found ${repoFiles.length} file(s) at ref "${ref}". Select and merge.`, 'success');
   } catch (err) {
     const label = classifyError(err, err.status);
     showStatus('❌ ' + label, 'error');
@@ -461,7 +519,7 @@ let dragCounter = 0;
 // File input change
 fileInput.onchange = (e) => {
   addLocalFiles([...e.target.files]);
-  fileInput.value = ''; // reset so same file can be re-selected
+  fileInput.value = '';
 };
 
 // Drag & drop
@@ -475,7 +533,6 @@ dropZone.ondrop = (e) => {
 
 function addLocalFiles(files) {
   for (const file of files) {
-    // Check if already added (by name + size)
     if (localFiles.some(f => f.name === file.name && f.size === file.size)) continue;
     localFiles.push({
       file,
@@ -568,7 +625,6 @@ function bindDragAndDrop() {
       if (draggedIdx !== null && draggedIdx !== dropIdx) {
         const moved = localFiles.splice(draggedIdx, 1)[0];
         localFiles.splice(dropIdx, 0, moved);
-        // Switch sort to custom since user manually reordered
         document.getElementById('sortBy').value = 'custom';
         renderLocalFileList();
       }
