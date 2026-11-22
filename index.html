@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Merge Files — URLs & GitHub Repos</title>
+<title>Merge Files — URLs, GitHub Repos & Local</title>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -26,12 +26,13 @@
   button:hover { background: #1d4ed8; }
   button.secondary { background: #6b7280; }
   button.secondary:hover { background: #4b5563; }
+  button.small { padding: 0.25rem 0.5rem; font-size: 0.75rem; margin: 0; }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
   .row { margin-bottom: 1.2rem; }
   label { font-weight: 500; display: block; margin-bottom: 0.3rem; }
   .hint { font-size: 0.8rem; color: #666; margin-top: 0.2rem; }
   .hint code { background: #eee; padding: 1px 4px; border-radius: 3px; font-size: 0.78rem; }
-  .mode-tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+  .mode-tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
   .mode-tab {
     padding: 0.5rem 1rem; border: 1px solid #ccc; border-radius: 6px;
     cursor: pointer; background: #fff; font-size: 0.9rem;
@@ -44,17 +45,20 @@
     max-height: 420px; overflow: auto; white-space: pre-wrap; word-break: break-all; font-size: 0.85rem;
   }
   .file-list {
-    max-height: 320px; overflow: auto; border: 1px solid #ddd; border-radius: 6px;
+    max-height: 420px; overflow: auto; border: 1px solid #ddd; border-radius: 6px;
     background: #fff; padding: 0.5rem;
   }
   .file-item {
     display: flex; align-items: center; padding: 0.25rem 0.4rem;
     font-family: ui-monospace, monospace; font-size: 0.82rem;
+    gap: 0.4rem;
   }
   .file-item:nth-child(odd) { background: #f9fafb; }
-  .file-item input[type="checkbox"] { margin-right: 0.5rem; flex-shrink: 0; }
+  .file-item.dragging { opacity: 0.5; background: #dbeafe; }
+  .file-item.drag-over { border-top: 2px solid #2563eb; }
+  .file-item input[type="checkbox"] { flex-shrink: 0; }
   .file-path { flex: 1; word-break: break-all; }
-  .file-size { color: #888; margin-left: 0.5rem; flex-shrink: 0; }
+  .file-size { color: #888; flex-shrink: 0; white-space: nowrap; }
   .controls { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
   .controls label { display: inline-flex; align-items: center; gap: 0.3rem; font-weight: 400; }
   .controls input[type="number"] { width: 80px; padding: 0.3rem; }
@@ -63,9 +67,9 @@
   .status.error { background: #fee2e2; color: #991b1b; }
   .status.success { background: #dcfce7; color: #166534; }
   .status { display: none; }
-  .select-actions { margin: 0.4rem 0; }
-  .select-actions button { padding: 0.3rem 0.7rem; font-size: 0.8rem; margin-right: 0.3rem; }
-  .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 99px; font-size: 0.75rem; font-weight: 500; }
+  .select-actions { margin: 0.4rem 0; display: flex; gap: 0.3rem; flex-wrap: wrap; align-items: center; }
+  .select-actions button { padding: 0.3rem 0.7rem; font-size: 0.8rem; margin: 0; }
+  .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 99px; font-size: 0.75rem; font-weight: 500; flex-shrink: 0; }
   .badge-text { background: #dbeafe; color: #1e40af; }
   .badge-bin { background: #fee2e2; color: #991b1b; }
   .proxy-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.8rem; }
@@ -75,16 +79,33 @@
   .result-err { color: #991b1b; }
   .result-warn { color: #854d0e; }
   .per-url-results { max-height: 200px; overflow: auto; }
+  /* Local files specific */
+  .drop-zone {
+    border: 2px dashed #ccc; border-radius: 8px; padding: 2rem; text-align: center;
+    background: #fafafa; transition: all 0.2s; cursor: pointer; margin-bottom: 1rem;
+  }
+  .drop-zone.dragover { border-color: #2563eb; background: #eff6ff; }
+  .drop-zone p { margin: 0.5rem 0; color: #666; }
+  .sort-controls { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; }
+  .sort-controls select { padding: 0.3rem; border-radius: 4px; border: 1px solid #ccc; font-size: 0.85rem; }
+  .order-btns { display: flex; gap: 0.2rem; }
+  .order-btns button { padding: 0.2rem 0.5rem; font-size: 0.75rem; margin: 0; }
+  .local-file-list .file-item { cursor: grab; }
+  .local-file-list .file-item:active { cursor: grabbing; }
+  .drag-handle { color: #999; cursor: grab; user-select: none; flex-shrink: 0; }
+  .remove-btn { background: #ef4444; padding: 0.15rem 0.4rem; font-size: 0.7rem; margin: 0; flex-shrink: 0; }
+  .remove-btn:hover { background: #dc2626; }
 </style>
 </head>
 <body>
 <div class="container">
 
-<h1>📎 Merge Files — URLs & GitHub Repos</h1>
+<h1>📎 Merge Files — URLs, GitHub Repos & Local</h1>
 
 <div class="mode-tabs">
   <div class="mode-tab active" data-mode="urls">🔗 URL List</div>
   <div class="mode-tab" data-mode="repo">📁 GitHub Repo</div>
+  <div class="mode-tab" data-mode="local">📂 Local Files</div>
 </div>
 
 <!-- ========== URL MODE ========== -->
@@ -139,6 +160,38 @@ https://raw.githubusercontent.com/user/repo/main/README.md"></textarea>
   </div>
 </div>
 
+<!-- ========== LOCAL FILES MODE ========== -->
+<div class="panel" id="panel-local">
+  <div class="drop-zone" id="dropZone">
+    <p>📂 Drag & drop files here, or</p>
+    <input type="file" id="fileInput" multiple style="display:none">
+    <button type="button" onclick="document.getElementById('fileInput').click()">Choose Files</button>
+    <p class="hint">Select text files from your computer. Binary files will be skipped.</p>
+  </div>
+  <div class="sort-controls" id="localSortControls" style="display:none">
+    <label>Sort by:</label>
+    <select id="sortBy">
+      <option value="custom">Custom Order (drag to reorder)</option>
+      <option value="name-asc">Name A→Z</option>
+      <option value="name-desc">Name Z→A</option>
+      <option value="size-asc">Size Small→Large</option>
+      <option value="size-desc">Size Large→Small</option>
+    </select>
+    <span class="hint" id="localFileCount"></span>
+  </div>
+  <div class="select-actions" id="localSelectActions" style="display:none">
+    <button class="secondary" id="localSelAll">Select All</button>
+    <button class="secondary" id="localSelNone">Select None</button>
+    <button class="secondary" id="localSelText">Text Only</button>
+    <button class="secondary" id="localClearAll" style="background:#ef4444">Clear All</button>
+  </div>
+  <div class="file-list local-file-list" id="localFileList"></div>
+  <div class="row" id="mergeLocalRow" style="display:none">
+    <button id="mergeLocalBtn">Merge Selected Files</button>
+    <span class="hint" id="localMergeCount"></span>
+  </div>
+</div>
+
 <!-- ========== STATUS ========== -->
 <div class="status" id="status"></div>
 
@@ -176,6 +229,7 @@ function getProxyUrl(url) {
 // ===================== STATE =====================
 let mergedText = '';
 let repoFiles = [];
+let localFiles = []; // { file: File, name: string, size: number, isBinary: boolean, content?: string }
 
 // ===================== DOM =====================
 const statusEl = document.getElementById('status');
@@ -240,7 +294,6 @@ function toRawGitHubUrl(input) {
 
 function resolveFetchUrl(raw, useProxy) {
   if (!useProxy) return raw;
-  // GitHub raw usually works without proxy; only proxy non-GitHub
   if (raw.startsWith('https://raw.githubusercontent.com/')) return raw;
   return getProxyUrl(raw);
 }
@@ -272,6 +325,7 @@ document.getElementById('mergeUrlsBtn').onclick = async () => {
 
   let okCount = 0, failCount = 0;
   const results = [];
+  mergedText = '';
 
   for (let i = 0; i < items.length; i++) {
     const { original, raw } = items[i];
@@ -280,9 +334,7 @@ document.getElementById('mergeUrlsBtn').onclick = async () => {
       const res = await fetchWithTimeout(fetchUrl);
       if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
       const ct = res.headers.get('content-type') || '';
-      if (ct.includes('image/') || ct.includes('application/octet-stream')) {
-        throw new Error('Binary file skipped');
-      }
+      if (ct.includes('image/') || ct.includes('application/octet-stream')) throw new Error('Binary file skipped');
       const text = await res.text();
       mergedText += `\n\n/* ===== [${i + 1}] ${original}\n       → ${raw} ===== */\n\n${text}`;
       okCount++;
@@ -291,7 +343,6 @@ document.getElementById('mergeUrlsBtn').onclick = async () => {
       failCount++;
       const label = classifyError(err, err.status);
       results.push(`<div class="result-item result-err">❌ [${i + 1}] ${original}<br>&nbsp;&nbsp;${label}</div>`);
-      // Append placeholder in merged output so numbering stays consistent
       mergedText += `\n\n/* ===== [${i + 1}] ${original}\n       → ${raw} ===== */\n/* FAILED: ${label} */\n`;
     }
   }
@@ -393,6 +444,160 @@ document.getElementById('mergeRepoBtn').onclick = async () => {
       failCount++;
       const label = classifyError(err, err.status);
       mergedText += `\n\n/* ===== ${f.path} ===== */\n/* FAILED: ${label} */\n`;
+    }
+  }
+
+  preview.textContent = mergedText;
+  if (failCount === 0) showStatus(`✅ Merged all ${okCount} file(s).`, 'success');
+  else showStatus(`⚠️ ${okCount} merged, ${failCount} failed.`, failCount === checked.length ? 'error' : 'loading');
+};
+
+// ===================== LOCAL FILES MODE =====================
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const localFileListEl = document.getElementById('localFileList');
+let dragCounter = 0;
+
+// File input change
+fileInput.onchange = (e) => {
+  addLocalFiles([...e.target.files]);
+  fileInput.value = ''; // reset so same file can be re-selected
+};
+
+// Drag & drop
+dropZone.ondragenter = (e) => { e.preventDefault(); dragCounter++; dropZone.classList.add('dragover'); };
+dropZone.ondragover = (e) => { e.preventDefault(); };
+dropZone.ondragleave = (e) => { e.preventDefault(); dragCounter--; if (dragCounter === 0) dropZone.classList.remove('dragover'); };
+dropZone.ondrop = (e) => {
+  e.preventDefault(); dragCounter = 0; dropZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) addLocalFiles([...e.dataTransfer.files]);
+};
+
+function addLocalFiles(files) {
+  for (const file of files) {
+    // Check if already added (by name + size)
+    if (localFiles.some(f => f.name === file.name && f.size === file.size)) continue;
+    localFiles.push({
+      file,
+      name: file.name,
+      size: file.size,
+      isBinary: isBinaryPath(file.name),
+      content: null
+    });
+  }
+  renderLocalFileList();
+}
+
+function renderLocalFileList() {
+  if (!localFiles.length) {
+    localFileListEl.innerHTML = '';
+    document.getElementById('localSortControls').style.display = 'none';
+    document.getElementById('localSelectActions').style.display = 'none';
+    document.getElementById('mergeLocalRow').style.display = 'none';
+    return;
+  }
+  document.getElementById('localSortControls').style.display = 'flex';
+  document.getElementById('localSelectActions').style.display = 'flex';
+  document.getElementById('mergeLocalRow').style.display = 'block';
+
+  localFileListEl.innerHTML = localFiles.map((f, i) => `
+    <div class="file-item" data-idx="${i}" draggable="true">
+      <span class="drag-handle">⠿</span>
+      <input type="checkbox" data-idx="${i}" ${f.isBinary ? '' : 'checked'}>
+      <span class="file-path">${f.name}</span>
+      <span class="file-size">${formatSize(f.size)}</span>
+      <span class="badge ${f.isBinary ? 'badge-bin' : 'badge-text'}">${f.isBinary ? 'BIN' : 'TXT'}</span>
+      <button class="remove-btn" data-idx="${i}">✕</button>
+    </div>
+  `).join('');
+  updateLocalFileCount();
+  bindDragAndDrop();
+}
+
+function updateLocalFileCount() {
+  const checked = localFileListEl.querySelectorAll('input[type="checkbox"]:checked').length;
+  document.getElementById('localFileCount').textContent = `${localFiles.length} file(s) total, ${checked} selected`;
+  document.getElementById('localMergeCount').textContent = `${checked} file(s) selected`;
+}
+localFileListEl.onchange = updateLocalFileCount;
+
+// Remove individual file
+localFileListEl.onclick = (e) => {
+  if (e.target.classList.contains('remove-btn')) {
+    const idx = parseInt(e.target.dataset.idx);
+    localFiles.splice(idx, 1);
+    renderLocalFileList();
+  }
+};
+
+// Sort
+document.getElementById('sortBy').onchange = (e) => {
+  const sortBy = e.target.value;
+  if (sortBy === 'custom') return;
+  const [key, dir] = sortBy.split('-');
+  localFiles.sort((a, b) => {
+    if (key === 'name') return dir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+    if (key === 'size') return dir === 'asc' ? (a.size || 0) - (b.size || 0) : (b.size || 0) - (a.size || 0);
+    return 0;
+  });
+  renderLocalFileList();
+};
+
+// Select actions
+document.getElementById('localSelAll').onclick = () => { localFileListEl.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true); updateLocalFileCount(); };
+document.getElementById('localSelNone').onclick = () => { localFileListEl.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false); updateLocalFileCount(); };
+document.getElementById('localSelText').onclick = () => { localFileListEl.querySelectorAll('.file-item').forEach(row => { const cb = row.querySelector('input[type="checkbox"]'); const badge = row.querySelector('.badge'); cb.checked = badge && badge.textContent === 'TXT'; }); updateLocalFileCount(); };
+document.getElementById('localClearAll').onclick = () => { localFiles = []; renderLocalFileList(); };
+
+// Drag-to-reorder within local file list
+let draggedIdx = null;
+function bindDragAndDrop() {
+  const items = localFileListEl.querySelectorAll('.file-item');
+  items.forEach(item => {
+    item.ondragstart = (e) => {
+      draggedIdx = parseInt(item.dataset.idx);
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    };
+    item.ondragover = (e) => { e.preventDefault(); item.classList.add('drag-over'); };
+    item.ondragleave = () => item.classList.remove('drag-over');
+    item.ondrop = (e) => {
+      e.preventDefault();
+      item.classList.remove('drag-over');
+      const dropIdx = parseInt(item.dataset.idx);
+      if (draggedIdx !== null && draggedIdx !== dropIdx) {
+        const moved = localFiles.splice(draggedIdx, 1)[0];
+        localFiles.splice(dropIdx, 0, moved);
+        // Switch sort to custom since user manually reordered
+        document.getElementById('sortBy').value = 'custom';
+        renderLocalFileList();
+      }
+    };
+    item.ondragend = () => { item.classList.remove('dragging'); draggedIdx = null; };
+  });
+}
+
+// Merge local files
+document.getElementById('mergeLocalBtn').onclick = async () => {
+  clearStatus();
+  const checked = [...localFileListEl.querySelectorAll('input[type="checkbox"]:checked')].map(cb => localFiles[parseInt(cb.dataset.idx)]);
+  if (!checked.length) return showStatus('Select at least one file.', 'error');
+
+  preview.textContent = 'Reading files…';
+  showStatus(`Reading ${checked.length} file(s)…`, 'loading');
+
+  let okCount = 0, failCount = 0;
+  mergedText = '';
+
+  for (let i = 0; i < checked.length; i++) {
+    const f = checked[i];
+    try {
+      const text = await f.file.text();
+      mergedText += `\n\n/* ===== [${i + 1}] ${f.name} ===== */\n\n${text}`;
+      okCount++;
+    } catch (err) {
+      failCount++;
+      mergedText += `\n\n/* ===== [${i + 1}] ${f.name} ===== */\n/* FAILED: ${err.message} */\n`;
     }
   }
 
