@@ -60,7 +60,7 @@
   .file-path { flex: 1; word-break: break-all; }
   .file-size { color: #888; flex-shrink: 0; white-space: nowrap; }
   .controls { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
-  .controls label { display: inline-flex; align-items: center; gap: 0.3rem; font-weight: 400; }
+  .controls label { display: inline-flex; align-items: center; gap: 0.3rem; font-weight: 400; margin: 0; }
   .controls input[type="number"] { width: 80px; padding: 0.3rem; }
   .status { padding: 0.6rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem; }
   .status.loading { background: #fef9c3; color: #854d0e; }
@@ -72,6 +72,7 @@
   .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 99px; font-size: 0.75rem; font-weight: 500; flex-shrink: 0; }
   .badge-text { background: #dbeafe; color: #1e40af; }
   .badge-bin { background: #fee2e2; color: #991b1b; }
+  .badge-base64 { background: #fef3c7; color: #92400e; }
   .proxy-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.8rem; }
   .proxy-row input[type="checkbox"] { width: auto; }
   .result-item { margin-bottom: 0.3rem; font-size: 0.82rem; font-family: ui-monospace, monospace; }
@@ -79,6 +80,8 @@
   .result-err { color: #991b1b; }
   .result-warn { color: #854d0e; }
   .per-url-results { max-height: 200px; overflow: auto; }
+  .binary-mode-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.8rem; flex-wrap: wrap; }
+  .binary-mode-row select { padding: 0.3rem; border-radius: 4px; border: 1px solid #ccc; font-size: 0.85rem; }
   /* Local files specific */
   .drop-zone {
     border: 2px dashed #ccc; border-radius: 8px; padding: 2rem; text-align: center;
@@ -88,8 +91,6 @@
   .drop-zone p { margin: 0.5rem 0; color: #666; }
   .sort-controls { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; }
   .sort-controls select { padding: 0.3rem; border-radius: 4px; border: 1px solid #ccc; font-size: 0.85rem; }
-  .order-btns { display: flex; gap: 0.2rem; }
-  .order-btns button { padding: 0.2rem 0.5rem; font-size: 0.75rem; margin: 0; }
   .local-file-list .file-item { cursor: grab; }
   .local-file-list .file-item:active { cursor: grabbing; }
   .drag-handle { color: #999; cursor: grab; user-select: none; flex-shrink: 0; }
@@ -113,18 +114,22 @@
   <div class="proxy-row">
     <input type="checkbox" id="useProxy">
     <label for="useProxy" style="display:inline;font-weight:400">
-      🌐 Use CORS proxy for non-GitHub URLs (needed for sites like 69shuba, blogs, etc.)
+      🌐 Use CORS proxy for non-GitHub URLs
     </label>
   </div>
   <div class="row">
     <label>File URLs (one per line)</label>
     <textarea id="urls" placeholder="https://github.com/user/repo/blob/main/a.js
-https://www.69shuba.com/txt/56507/35975229
 https://raw.githubusercontent.com/user/repo/main/README.md"></textarea>
-    <div class="hint">
-      GitHub links auto‑converted to raw. Non‑GitHub sites usually need the <strong>CORS proxy</strong> toggle above.
-      Proxy: <code>corsproxy.io</code> (public, rate‑limited).
-    </div>
+  </div>
+  <div class="binary-mode-row">
+    <label>Binary files:</label>
+    <select id="urlBinaryMode">
+      <option value="skip">Skip binaries</option>
+      <option value="stub">Include as metadata stub (AI-friendly)</option>
+      <option value="base64">Include as base64 (fully recoverable)</option>
+    </select>
+    <span class="hint">How to handle detected binary files</span>
   </div>
   <button id="mergeUrlsBtn">Merge Files</button>
   <div class="per-url-results" id="urlResults"></div>
@@ -135,7 +140,7 @@ https://raw.githubusercontent.com/user/repo/main/README.md"></textarea>
   <div class="proxy-row">
     <input type="checkbox" id="useProxyRepo">
     <label for="useProxyRepo" style="display:inline;font-weight:400">
-      🌐 Use CORS proxy for raw.githubusercontent.com (only if you get CORS errors)
+      🌐 Use CORS proxy for raw.githubusercontent.com
     </label>
   </div>
   <div class="row">
@@ -144,18 +149,28 @@ https://raw.githubusercontent.com/user/repo/main/README.md"></textarea>
     <div class="hint">
       Supports: repo root, <code>/tree/branch</code>, <code>/tree/tag</code>, <code>/commit/sha</code>,
       <code>/archive/refs/tags/v1.0.0</code>, <code>/archive/refs/heads/main</code>.
-      Files listed via API, fetched via raw URLs.
     </div>
   </div>
   <div class="controls row">
     <label>Max file size (KB): <input type="number" id="maxKb" value="500" min="1"></label>
-    <label><input type="checkbox" id="skipBinaries" checked> Skip likely binaries</label>
+    <label><input type="checkbox" id="skipBinaries" checked> Auto-skip binaries</label>
+  </div>
+  <div class="binary-mode-row">
+    <label>Binary handling:</label>
+    <select id="repoBinaryMode">
+      <option value="skip">Skip binaries entirely</option>
+      <option value="stub" selected>Include as metadata stub (AI-friendly)</option>
+      <option value="base64">Include as base64 (fully recoverable)</option>
+    </select>
+  </div>
+  <div class="controls row">
     <button id="loadRepoBtn">Load Repo Files</button>
   </div>
   <div class="select-actions" id="selectActions" style="display:none">
     <button class="secondary" id="selAll">Select All</button>
     <button class="secondary" id="selNone">Select None</button>
     <button class="secondary" id="selText">Text Only</button>
+    <button class="secondary" id="selBin">Binaries Too</button>
   </div>
   <div class="file-list" id="fileList"></div>
   <div class="row" id="mergeRepoRow" style="display:none">
@@ -170,7 +185,14 @@ https://raw.githubusercontent.com/user/repo/main/README.md"></textarea>
     <p>📂 Drag & drop files here, or</p>
     <input type="file" id="fileInput" multiple style="display:none">
     <button type="button" onclick="document.getElementById('fileInput').click()">Choose Files</button>
-    <p class="hint">Select text files from your computer. Binary files will be skipped.</p>
+  </div>
+  <div class="binary-mode-row">
+    <label>Binary handling:</label>
+    <select id="localBinaryMode">
+      <option value="skip">Skip binaries entirely</option>
+      <option value="stub" selected>Include as metadata stub (AI-friendly)</option>
+      <option value="base64">Include as base64 (fully recoverable)</option>
+    </select>
   </div>
   <div class="sort-controls" id="localSortControls" style="display:none">
     <label>Sort by:</label>
@@ -187,6 +209,7 @@ https://raw.githubusercontent.com/user/repo/main/README.md"></textarea>
     <button class="secondary" id="localSelAll">Select All</button>
     <button class="secondary" id="localSelNone">Select None</button>
     <button class="secondary" id="localSelText">Text Only</button>
+    <button class="secondary" id="localSelBin">Binaries Too</button>
     <button class="secondary" id="localClearAll" style="background:#ef4444">Clear All</button>
   </div>
   <div class="file-list local-file-list" id="localFileList"></div>
@@ -211,6 +234,7 @@ https://raw.githubusercontent.com/user/repo/main/README.md"></textarea>
 <div class="row">
   <button id="copyBtn">📋 Copy to Clipboard</button>
   <button id="downloadBtn">💾 Download File</button>
+  <span class="hint" id="outputSize"></span>
 </div>
 
 </div>
@@ -233,7 +257,7 @@ function getProxyUrl(url) {
 // ===================== STATE =====================
 let mergedText = '';
 let repoFiles = [];
-let localFiles = []; // { file: File, name: string, size: number, isBinary: boolean, content?: string }
+let localFiles = [];
 
 // ===================== DOM =====================
 const statusEl = document.getElementById('status');
@@ -268,6 +292,20 @@ function formatSize(bytes) {
 }
 
 function isBinaryPath(path) { return BINARY_EXT.test(path) || BINARY_DIRS.test(path); }
+
+function getMimeFromPath(path) {
+  const ext = path.split('.').pop().toLowerCase();
+  const mimeMap = {
+    png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp',
+    svg: 'image/svg+xml', ico: 'image/x-icon', pdf: 'application/pdf', zip: 'application/zip',
+    gz: 'application/gzip', tar: 'application/x-tar', rar: 'application/vnd.rar',
+    '7z': 'application/x-7z-compressed', mp3: 'audio/mpeg', mp4: 'video/mp4', webm: 'video/webm',
+    wasm: 'application/wasm', ttf: 'font/ttf', woff: 'font/woff', woff2: 'font/woff2',
+    exe: 'application/octet-stream', dll: 'application/octet-stream', bin: 'application/octet-stream',
+    json: 'application/json', md: 'text/markdown', js: 'text/javascript', css: 'text/css', html: 'text/html'
+  };
+  return mimeMap[ext] || 'application/octet-stream';
+}
 
 function classifyError(err, status) {
   if (err && err.name === 'AbortError') return '⏱ Timeout';
@@ -315,11 +353,54 @@ async function fetchWithTimeout(url, ms = 15000) {
   }
 }
 
+// ===================== BINARY ENCODING HELPERS =====================
+// Convert ArrayBuffer to base64
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  // Process in chunks to avoid call stack limits on large files
+  const chunkSize = 8192;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.slice(i, i + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+}
+
+// Convert Blob/File to base64
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      // reader.result is "data:mime;base64,..." — extract just the base64 part
+      const base64 = reader.result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+// Format a binary file entry based on mode
+function formatBinaryEntry(path, size, mime, base64Content, mode) {
+  if (mode === 'skip') return '';
+  if (mode === 'stub') {
+    return `\n\n/* ===== ${path} (BINARY — skipped, ${formatSize(size)}, ${mime}) ===== */\n/* [Binary file not included. Use original file for content.] */\n`;
+  }
+  if (mode === 'base64') {
+    // Wrap long base64 lines at 76 chars (MIME standard)
+    const wrapped = base64Content.match(/.{1,76}/g).join('\n');
+    return `\n\n/* ===== ${path} (BINARY, base64, ${formatSize(size)}, ${mime}) ===== */\n/* EXTRACT: decode the base64 block below to recover original file */\ndata:${mime};base64,${base64Content.length > 500 ? '\n' + wrapped : base64Content}\n`;
+  }
+  return '';
+}
+
 // ===================== URL MODE MERGE =====================
 document.getElementById('mergeUrlsBtn').onclick = async () => {
   clearStatus();
   urlResultsEl.innerHTML = '';
   const useProxy = document.getElementById('useProxy').checked;
+  const binaryMode = document.getElementById('urlBinaryMode').value;
   const rawInputs = document.getElementById('urls').value.split('\n').map(s => s.trim()).filter(Boolean);
   if (!rawInputs.length) return showStatus('Enter at least one URL', 'error');
 
@@ -327,7 +408,7 @@ document.getElementById('mergeUrlsBtn').onclick = async () => {
   preview.textContent = 'Loading…';
   showStatus(`Fetching ${items.length} file(s)…`, 'loading');
 
-  let okCount = 0, failCount = 0;
+  let okCount = 0, failCount = 0, binCount = 0;
   const results = [];
   mergedText = '';
 
@@ -338,11 +419,33 @@ document.getElementById('mergeUrlsBtn').onclick = async () => {
       const res = await fetchWithTimeout(fetchUrl);
       if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
       const ct = res.headers.get('content-type') || '';
-      if (ct.includes('image/') || ct.includes('application/octet-stream')) throw new Error('Binary file skipped');
-      const text = await res.text();
-      mergedText += `\n\n/* ===== [${i + 1}] ${original}\n       → ${raw} ===== */\n\n${text}`;
-      okCount++;
-      results.push(`<div class="result-item result-ok">✅ [${i + 1}] ${original}</div>`);
+      const buffer = await res.arrayBuffer();
+      const isBinary = BINARY_EXT.test(original) || ct.includes('image/') || ct.includes('application/octet-stream') || ct.includes('application/pdf') || ct.includes('application/zip');
+
+      if (isBinary) {
+        binCount++;
+        if (binaryMode === 'skip') {
+          results.push(`<div class="result-item result-warn">⏭ [${i + 1}] ${original} — binary skipped</div>`);
+          mergedText += `\n\n/* ===== [${i + 1}] ${original} — BINARY SKIPPED ===== */\n`;
+          continue;
+        }
+        const mime = ct && ct !== 'application/octet-stream' ? ct : getMimeFromPath(original);
+        if (binaryMode === 'stub') {
+          results.push(`<div class="result-item result-warn">📎 [${i + 1}] ${original} — binary stub</div>`);
+          mergedText += `\n\n/* ===== [${i + 1}] ${original} (BINARY — skipped, ${formatSize(buffer.byteLength)}, ${mime}) ===== */\n/* [Binary file not included.] */\n`;
+        } else {
+          results.push(`<div class="result-item result-ok">📎 [${i + 1}] ${original} — base64 encoded</div>`);
+          const base64 = arrayBufferToBase64(buffer);
+          const wrapped = base64.match(/.{1,76}/g).join('\n');
+          mergedText += `\n\n/* ===== [${i + 1}] ${original} (BINARY, base64, ${formatSize(buffer.byteLength)}, ${mime}) ===== */\n${wrapped}\n`;
+        }
+        okCount++;
+      } else {
+        const text = new TextDecoder('utf-8').decode(buffer);
+        mergedText += `\n\n/* ===== [${i + 1}] ${original}\n       → ${raw} ===== */\n\n${text}`;
+        okCount++;
+        results.push(`<div class="result-item result-ok">✅ [${i + 1}] ${original}</div>`);
+      }
     } catch (err) {
       failCount++;
       const label = classifyError(err, err.status);
@@ -353,8 +456,9 @@ document.getElementById('mergeUrlsBtn').onclick = async () => {
 
   urlResultsEl.innerHTML = results.join('');
   preview.textContent = mergedText || 'No content merged.';
-  if (failCount === 0) showStatus(`✅ All ${okCount} file(s) merged.`, 'success');
-  else showStatus(`⚠️ ${okCount} merged, ${failCount} failed. See details below.`, failCount === items.length ? 'error' : 'loading');
+  document.getElementById('outputSize').textContent = `Output: ${formatSize(new Blob([mergedText]).size)}`;
+  if (failCount === 0) showStatus(`✅ ${okCount} file(s) merged${binCount ? `, ${binCount} binary(ies) handled` : ''}.`, 'success');
+  else showStatus(`⚠️ ${okCount} merged, ${failCount} failed.`, failCount === items.length ? 'error' : 'loading');
 };
 
 // ===================== REPO MODE =====================
@@ -363,51 +467,25 @@ document.getElementById('loadRepoBtn').onclick = async () => {
   const repoInput = document.getElementById('repoUrl').value.trim();
   if (!repoInput) return showStatus('Enter a GitHub repository URL.', 'error');
 
-  // Parse various GitHub URL formats:
-  // - https://github.com/owner/repo
-  // - https://github.com/owner/repo/tree/v1.0.0
-  // - https://github.com/owner/repo/tree/main
-  // - https://github.com/owner/repo/commit/abc123
-  // - https://github.com/owner/repo/archive/refs/tags/v1.0.0
-  // - https://github.com/owner/repo/archive/refs/heads/main
-  // - https://github.com/owner/repo/releases/tag/v1.0.0
-
   let owner, repo, ref = null, isCommit = false;
 
   try {
     const url = new URL(repoInput);
     if (url.hostname !== 'github.com') throw new Error('Not a GitHub URL');
-
     const parts = url.pathname.split('/').filter(Boolean);
     if (parts.length < 2) throw new Error('Invalid GitHub URL');
-
     owner = parts[0];
     repo = parts[1].replace(/\.git$/, '');
-
-    // Handle /tree/<ref>
-    if (parts[2] === 'tree' && parts[3]) {
-      ref = parts[3];
-    }
-    // Handle /commit/<sha>
-    else if (parts[2] === 'commit' && parts[3]) {
-      ref = parts[3];
-      isCommit = true;
-    }
-    // Handle /archive/refs/tags/<tag> or /archive/refs/heads/<branch>
+    if (parts[2] === 'tree' && parts[3]) ref = parts[3];
+    else if (parts[2] === 'commit' && parts[3]) { ref = parts[3]; isCommit = true; }
     else if (parts[2] === 'archive' && parts[3] === 'refs') {
       if (parts[4] === 'tags' && parts[5]) ref = parts[5];
       else if (parts[4] === 'heads' && parts[5]) ref = parts[5];
     }
-    // Handle /releases/tag/<tag>
-    else if (parts[2] === 'releases' && parts[3] === 'tag' && parts[4]) {
-      ref = parts[4];
-    }
-    // Handle /tags/<tag>
-    else if (parts[2] === 'tags' && parts[3]) {
-      ref = parts[3];
-    }
+    else if (parts[2] === 'releases' && parts[3] === 'tag' && parts[4]) ref = parts[4];
+    else if (parts[2] === 'tags' && parts[3]) ref = parts[3];
   } catch (e) {
-    return showStatus('Invalid GitHub URL. Use https://github.com/owner/repo[/tree/ref]', 'error');
+    return showStatus('Invalid GitHub URL.', 'error');
   }
 
   const maxKb = parseInt(document.getElementById('maxKb').value) || 500;
@@ -418,18 +496,14 @@ document.getElementById('loadRepoBtn').onclick = async () => {
   fileListEl.innerHTML = '';
 
   try {
-    // Get repo metadata
     const metaRes = await fetchWithTimeout(`https://api.github.com/repos/${owner}/${repo}`, 10000);
     if (!metaRes.ok) throw Object.assign(new Error(`Repo API ${metaRes.status}`), { status: metaRes.status });
     const meta = await metaRes.json();
-
-    // If no ref specified, use default branch
     if (!ref) ref = meta.default_branch;
 
-    // For commit SHAs, verify it exists
     if (isCommit) {
       const commitRes = await fetchWithTimeout(`https://api.github.com/repos/${owner}/${repo}/commits/${ref}`, 10000);
-      if (!commitRes.ok) throw Object.assign(new Error(`Commit not found: ${ref}`), { status: commitRes.status });
+      if (!commitRes.ok) throw Object.assign(new Error(`Commit not found`), { status: commitRes.status });
     }
 
     showStatus(`Fetching file tree for ref: ${ref}…`, 'loading');
@@ -443,23 +517,23 @@ document.getElementById('loadRepoBtn').onclick = async () => {
       raw: `https://raw.githubusercontent.com/${owner}/${repo}/${encodeURIComponent(ref)}/${encodeURI(n.path)}`,
       size: n.size,
       isBinary: isBinaryPath(n.path)
-    })).filter(n => !skipBin || !n.isBinary).filter(n => (n.size ?? 0) <= maxBytes);
+    })).filter(n => (n.size ?? 0) <= maxBytes);
 
-    if (!repoFiles.length) return showStatus('No text files found within size limit.', 'error');
-    renderFileList();
+    // Apply skipBin filter to checkbox default only
+    if (!repoFiles.length) return showStatus('No files found within size limit.', 'error');
+    renderFileList(skipBin);
     document.getElementById('selectActions').style.display = 'block';
     document.getElementById('mergeRepoRow').style.display = 'block';
-    showStatus(`✅ Found ${repoFiles.length} file(s) at ref "${ref}". Select and merge.`, 'success');
+    showStatus(`✅ Found ${repoFiles.length} file(s) at ref "${ref}".`, 'success');
   } catch (err) {
-    const label = classifyError(err, err.status);
-    showStatus('❌ ' + label, 'error');
+    showStatus('❌ ' + classifyError(err, err.status), 'error');
   }
 };
 
-function renderFileList() {
+function renderFileList(uncheckBinaries = false) {
   fileListEl.innerHTML = repoFiles.map((f, i) => `
     <div class="file-item">
-      <input type="checkbox" data-idx="${i}" ${f.isBinary ? '' : 'checked'}>
+      <input type="checkbox" data-idx="${i}" ${(!f.isBinary || !uncheckBinaries) ? 'checked' : ''}>
       <span class="file-path">${f.path}</span>
       <span class="file-size">${formatSize(f.size)}</span>
       <span class="badge ${f.isBinary ? 'badge-bin' : 'badge-text'}">${f.isBinary ? 'BIN' : 'TXT'}</span>
@@ -475,18 +549,20 @@ fileListEl.onchange = updateRepoFileCount;
 
 document.getElementById('selAll').onclick = () => { fileListEl.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true); updateRepoFileCount(); };
 document.getElementById('selNone').onclick = () => { fileListEl.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false); updateRepoFileCount(); };
-document.getElementById('selText').onclick = () => { fileListEl.querySelectorAll('.file-item').forEach(row => { const cb = row.querySelector('input[type="checkbox"]'); const badge = row.querySelector('.badge'); cb.checked = badge && badge.textContent === 'TXT'; }); updateRepoFileCount(); };
+document.getElementById('selText').onclick = () => { fileListEl.querySelectorAll('.file-item').forEach(row => { const cb = row.querySelector('input[type="checkbox"]'); cb.checked = !row.querySelector('.badge').textContent.includes('BIN'); }); updateRepoFileCount(); };
+document.getElementById('selBin').onclick = () => { fileListEl.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true); updateRepoFileCount(); };
 
 document.getElementById('mergeRepoBtn').onclick = async () => {
   clearStatus();
   const useProxy = document.getElementById('useProxyRepo').checked;
+  const binaryMode = document.getElementById('repoBinaryMode').value;
   const checked = [...fileListEl.querySelectorAll('input[type="checkbox"]:checked')].map(cb => repoFiles[parseInt(cb.dataset.idx)]);
   if (!checked.length) return showStatus('Select at least one file.', 'error');
 
   preview.textContent = 'Loading…';
   showStatus(`Fetching ${checked.length} file(s)…`, 'loading');
 
-  let okCount = 0, failCount = 0;
+  let okCount = 0, failCount = 0, binCount = 0;
   mergedText = '';
 
   for (let i = 0; i < checked.length; i++) {
@@ -495,8 +571,24 @@ document.getElementById('mergeRepoBtn').onclick = async () => {
     try {
       const res = await fetchWithTimeout(fetchUrl);
       if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
-      const text = await res.text();
-      mergedText += `\n\n/* ===== ${f.path} ===== */\n\n${text}`;
+      const buffer = await res.arrayBuffer();
+      const mime = getMimeFromPath(f.path);
+
+      if (f.isBinary) {
+        binCount++;
+        if (binaryMode === 'skip') {
+          mergedText += `\n\n/* ===== ${f.path} — BINARY SKIPPED ===== */\n`;
+        } else if (binaryMode === 'stub') {
+          mergedText += `\n\n/* ===== ${f.path} (BINARY — skipped, ${formatSize(f.size)}, ${mime}) ===== */\n/* [Binary file not included. Use original file for content.] */\n`;
+        } else {
+          const base64 = arrayBufferToBase64(buffer);
+          const wrapped = base64.match(/.{1,76}/g).join('\n');
+          mergedText += `\n\n/* ===== ${f.path} (BINARY, base64, ${formatSize(f.size)}, ${mime}) ===== */\n${wrapped}\n`;
+        }
+      } else {
+        const text = new TextDecoder('utf-8').decode(buffer);
+        mergedText += `\n\n/* ===== ${f.path} ===== */\n\n${text}`;
+      }
       okCount++;
     } catch (err) {
       failCount++;
@@ -506,8 +598,9 @@ document.getElementById('mergeRepoBtn').onclick = async () => {
   }
 
   preview.textContent = mergedText;
-  if (failCount === 0) showStatus(`✅ Merged all ${okCount} file(s).`, 'success');
-  else showStatus(`⚠️ ${okCount} merged, ${failCount} failed.`, failCount === checked.length ? 'error' : 'loading');
+  document.getElementById('outputSize').textContent = `Output: ${formatSize(new Blob([mergedText]).size)}`;
+  if (failCount === 0) showStatus(`✅ ${okCount} file(s) processed${binCount ? `, ${binCount} binary(ies) handled` : ''}.`, 'success');
+  else showStatus(`⚠️ ${okCount} ok, ${failCount} failed.`, failCount === checked.length ? 'error' : 'loading');
 };
 
 // ===================== LOCAL FILES MODE =====================
@@ -516,13 +609,8 @@ const fileInput = document.getElementById('fileInput');
 const localFileListEl = document.getElementById('localFileList');
 let dragCounter = 0;
 
-// File input change
-fileInput.onchange = (e) => {
-  addLocalFiles([...e.target.files]);
-  fileInput.value = '';
-};
+fileInput.onchange = (e) => { addLocalFiles([...e.target.files]); fileInput.value = ''; };
 
-// Drag & drop
 dropZone.ondragenter = (e) => { e.preventDefault(); dragCounter++; dropZone.classList.add('dragover'); };
 dropZone.ondragover = (e) => { e.preventDefault(); };
 dropZone.ondragleave = (e) => { e.preventDefault(); dragCounter--; if (dragCounter === 0) dropZone.classList.remove('dragover'); };
@@ -534,13 +622,7 @@ dropZone.ondrop = (e) => {
 function addLocalFiles(files) {
   for (const file of files) {
     if (localFiles.some(f => f.name === file.name && f.size === file.size)) continue;
-    localFiles.push({
-      file,
-      name: file.name,
-      size: file.size,
-      isBinary: isBinaryPath(file.name),
-      content: null
-    });
+    localFiles.push({ file, name: file.name, size: file.size, isBinary: isBinaryPath(file.name) });
   }
   renderLocalFileList();
 }
@@ -578,49 +660,38 @@ function updateLocalFileCount() {
 }
 localFileListEl.onchange = updateLocalFileCount;
 
-// Remove individual file
 localFileListEl.onclick = (e) => {
   if (e.target.classList.contains('remove-btn')) {
-    const idx = parseInt(e.target.dataset.idx);
-    localFiles.splice(idx, 1);
+    localFiles.splice(parseInt(e.target.dataset.idx), 1);
     renderLocalFileList();
   }
 };
 
-// Sort
 document.getElementById('sortBy').onchange = (e) => {
-  const sortBy = e.target.value;
-  if (sortBy === 'custom') return;
-  const [key, dir] = sortBy.split('-');
+  const [key, dir] = e.target.value.split('-');
+  if (e.target.value === 'custom') return;
   localFiles.sort((a, b) => {
     if (key === 'name') return dir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
-    if (key === 'size') return dir === 'asc' ? (a.size || 0) - (b.size || 0) : (b.size || 0) - (a.size || 0);
+    if (key === 'size') return dir === 'asc' ? (a.size||0) - (b.size||0) : (b.size||0) - (a.size||0);
     return 0;
   });
   renderLocalFileList();
 };
 
-// Select actions
 document.getElementById('localSelAll').onclick = () => { localFileListEl.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true); updateLocalFileCount(); };
 document.getElementById('localSelNone').onclick = () => { localFileListEl.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false); updateLocalFileCount(); };
-document.getElementById('localSelText').onclick = () => { localFileListEl.querySelectorAll('.file-item').forEach(row => { const cb = row.querySelector('input[type="checkbox"]'); const badge = row.querySelector('.badge'); cb.checked = badge && badge.textContent === 'TXT'; }); updateLocalFileCount(); };
+document.getElementById('localSelText').onclick = () => { localFileListEl.querySelectorAll('.file-item').forEach(row => { const cb = row.querySelector('input[type="checkbox"]'); cb.checked = !row.querySelector('.badge').textContent.includes('BIN'); }); updateLocalFileCount(); };
+document.getElementById('localSelBin').onclick = () => { localFileListEl.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true); updateLocalFileCount(); };
 document.getElementById('localClearAll').onclick = () => { localFiles = []; renderLocalFileList(); };
 
-// Drag-to-reorder within local file list
 let draggedIdx = null;
 function bindDragAndDrop() {
-  const items = localFileListEl.querySelectorAll('.file-item');
-  items.forEach(item => {
-    item.ondragstart = (e) => {
-      draggedIdx = parseInt(item.dataset.idx);
-      item.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-    };
+  localFileListEl.querySelectorAll('.file-item').forEach(item => {
+    item.ondragstart = (e) => { draggedIdx = parseInt(item.dataset.idx); item.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; };
     item.ondragover = (e) => { e.preventDefault(); item.classList.add('drag-over'); };
     item.ondragleave = () => item.classList.remove('drag-over');
     item.ondrop = (e) => {
-      e.preventDefault();
-      item.classList.remove('drag-over');
+      e.preventDefault(); item.classList.remove('drag-over');
       const dropIdx = parseInt(item.dataset.idx);
       if (draggedIdx !== null && draggedIdx !== dropIdx) {
         const moved = localFiles.splice(draggedIdx, 1)[0];
@@ -633,23 +704,36 @@ function bindDragAndDrop() {
   });
 }
 
-// Merge local files
 document.getElementById('mergeLocalBtn').onclick = async () => {
   clearStatus();
+  const binaryMode = document.getElementById('localBinaryMode').value;
   const checked = [...localFileListEl.querySelectorAll('input[type="checkbox"]:checked')].map(cb => localFiles[parseInt(cb.dataset.idx)]);
   if (!checked.length) return showStatus('Select at least one file.', 'error');
 
   preview.textContent = 'Reading files…';
   showStatus(`Reading ${checked.length} file(s)…`, 'loading');
 
-  let okCount = 0, failCount = 0;
+  let okCount = 0, failCount = 0, binCount = 0;
   mergedText = '';
 
   for (let i = 0; i < checked.length; i++) {
     const f = checked[i];
     try {
-      const text = await f.file.text();
-      mergedText += `\n\n/* ===== [${i + 1}] ${f.name} ===== */\n\n${text}`;
+      if (f.isBinary) {
+        binCount++;
+        if (binaryMode === 'skip') {
+          mergedText += `\n\n/* ===== [${i + 1}] ${f.name} — BINARY SKIPPED ===== */\n`;
+        } else if (binaryMode === 'stub') {
+          mergedText += `\n\n/* ===== [${i + 1}] ${f.name} (BINARY — skipped, ${formatSize(f.size)}, ${getMimeFromPath(f.name)}) ===== */\n/* [Binary file not included. Use original file for content.] */\n`;
+        } else {
+          const base64 = await blobToBase64(f.file);
+          const wrapped = base64.match(/.{1,76}/g).join('\n');
+          mergedText += `\n\n/* ===== [${i + 1}] ${f.name} (BINARY, base64, ${formatSize(f.size)}, ${getMimeFromPath(f.name)}) ===== */\n${wrapped}\n`;
+        }
+      } else {
+        const text = await f.file.text();
+        mergedText += `\n\n/* ===== [${i + 1}] ${f.name} ===== */\n\n${text}`;
+      }
       okCount++;
     } catch (err) {
       failCount++;
@@ -658,8 +742,9 @@ document.getElementById('mergeLocalBtn').onclick = async () => {
   }
 
   preview.textContent = mergedText;
-  if (failCount === 0) showStatus(`✅ Merged all ${okCount} file(s).`, 'success');
-  else showStatus(`⚠️ ${okCount} merged, ${failCount} failed.`, failCount === checked.length ? 'error' : 'loading');
+  document.getElementById('outputSize').textContent = `Output: ${formatSize(new Blob([mergedText]).size)}`;
+  if (failCount === 0) showStatus(`✅ ${okCount} file(s) processed${binCount ? `, ${binCount} binary(ies) handled` : ''}.`, 'success');
+  else showStatus(`⚠️ ${okCount} ok, ${failCount} failed.`, failCount === checked.length ? 'error' : 'loading');
 };
 
 // ===================== COPY / DOWNLOAD =====================
