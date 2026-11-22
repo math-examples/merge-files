@@ -7,34 +7,21 @@
   * { box-sizing: border-box; }
   body {
     font-family: system-ui, -apple-system, sans-serif;
-    margin: 0;
-    padding: 2rem;
-    background: #f7f8fa;
-    color: #1a1a1a;
+    margin: 0; padding: 2rem;
+    background: #f7f8fa; color: #1a1a1a;
   }
   h1 { margin-top: 0; }
   h2 { margin-bottom: 0.4rem; font-size: 1.1rem; }
   .container { max-width: 960px; margin: 0 auto; }
   textarea, input[type="text"] {
-    width: 100%;
-    font-family: ui-monospace, monospace;
-    padding: 0.6rem;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    font-size: 0.9rem;
+    width: 100%; font-family: ui-monospace, monospace;
+    padding: 0.6rem; border: 1px solid #ccc; border-radius: 6px; font-size: 0.9rem;
   }
   textarea { height: 130px; resize: vertical; }
   button {
-    padding: 0.6rem 1.2rem;
-    margin-top: 0.5rem;
-    margin-right: 0.5rem;
-    cursor: pointer;
-    border: none;
-    border-radius: 6px;
-    background: #2563eb;
-    color: #fff;
-    font-size: 0.9rem;
-    font-weight: 500;
+    padding: 0.6rem 1.2rem; margin-top: 0.5rem; margin-right: 0.5rem;
+    cursor: pointer; border: none; border-radius: 6px;
+    background: #2563eb; color: #fff; font-size: 0.9rem; font-weight: 500;
   }
   button:hover { background: #1d4ed8; }
   button.secondary { background: #6b7280; }
@@ -43,43 +30,26 @@
   .row { margin-bottom: 1.2rem; }
   label { font-weight: 500; display: block; margin-bottom: 0.3rem; }
   .hint { font-size: 0.8rem; color: #666; margin-top: 0.2rem; }
+  .hint code { background: #eee; padding: 1px 4px; border-radius: 3px; font-size: 0.78rem; }
   .mode-tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
   .mode-tab {
-    padding: 0.5rem 1rem;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    cursor: pointer;
-    background: #fff;
-    font-size: 0.9rem;
+    padding: 0.5rem 1rem; border: 1px solid #ccc; border-radius: 6px;
+    cursor: pointer; background: #fff; font-size: 0.9rem;
   }
   .mode-tab.active { background: #2563eb; color: #fff; border-color: #2563eb; }
   .panel { display: none; }
   .panel.active { display: block; }
   pre {
-    background: #fff;
-    padding: 1rem;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    max-height: 420px;
-    overflow: auto;
-    white-space: pre-wrap;
-    word-break: break-all;
-    font-size: 0.85rem;
+    background: #fff; padding: 1rem; border: 1px solid #ddd; border-radius: 6px;
+    max-height: 420px; overflow: auto; white-space: pre-wrap; word-break: break-all; font-size: 0.85rem;
   }
   .file-list {
-    max-height: 320px;
-    overflow: auto;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    background: #fff;
-    padding: 0.5rem;
+    max-height: 320px; overflow: auto; border: 1px solid #ddd; border-radius: 6px;
+    background: #fff; padding: 0.5rem;
   }
   .file-item {
-    display: flex;
-    align-items: center;
-    padding: 0.25rem 0.4rem;
-    font-family: ui-monospace, monospace;
-    font-size: 0.82rem;
+    display: flex; align-items: center; padding: 0.25rem 0.4rem;
+    font-family: ui-monospace, monospace; font-size: 0.82rem;
   }
   .file-item:nth-child(odd) { background: #f9fafb; }
   .file-item input[type="checkbox"] { margin-right: 0.5rem; flex-shrink: 0; }
@@ -98,7 +68,13 @@
   .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 99px; font-size: 0.75rem; font-weight: 500; }
   .badge-text { background: #dbeafe; color: #1e40af; }
   .badge-bin { background: #fee2e2; color: #991b1b; }
-  .badge-dir { background: #f3f4f6; color: #4b5563; }
+  .proxy-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.8rem; }
+  .proxy-row input[type="checkbox"] { width: auto; }
+  .result-item { margin-bottom: 0.3rem; font-size: 0.82rem; font-family: ui-monospace, monospace; }
+  .result-ok { color: #166534; }
+  .result-err { color: #991b1b; }
+  .result-warn { color: #854d0e; }
+  .per-url-results { max-height: 200px; overflow: auto; }
 </style>
 </head>
 <body>
@@ -113,38 +89,50 @@
 
 <!-- ========== URL MODE ========== -->
 <div class="panel active" id="panel-urls">
+  <div class="proxy-row">
+    <input type="checkbox" id="useProxy">
+    <label for="useProxy" style="display:inline;font-weight:400">
+      🌐 Use CORS proxy for non-GitHub URLs (needed for sites like 69shuba, blogs, etc.)
+    </label>
+  </div>
   <div class="row">
     <label>File URLs (one per line)</label>
-    <textarea id="urls" placeholder="https://github.com/user/repo/blob/main/src/a.js
-https://github.com/user/repo/blob/main/src/b.js
+    <textarea id="urls" placeholder="https://github.com/user/repo/blob/main/a.js
+https://www.69shuba.com/txt/56507/35975229
 https://raw.githubusercontent.com/user/repo/main/README.md"></textarea>
-    <div class="hint">Paste GitHub or raw URLs. GitHub links are auto‑converted to raw. Supports raw.githubusercontent.com, gist raw, etc.</div>
+    <div class="hint">
+      GitHub links auto‑converted to raw. Non‑GitHub sites usually need the <strong>CORS proxy</strong> toggle above.
+      Proxy: <code>corsproxy.io</code> (public, rate‑limited).
+    </div>
   </div>
   <button id="mergeUrlsBtn">Merge Files</button>
+  <div class="per-url-results" id="urlResults"></div>
 </div>
 
 <!-- ========== REPO MODE ========== -->
 <div class="panel" id="panel-repo">
+  <div class="proxy-row">
+    <input type="checkbox" id="useProxyRepo">
+    <label for="useProxyRepo" style="display:inline;font-weight:400">
+      🌐 Use CORS proxy for raw.githubusercontent.com (only if you get CORS errors)
+    </label>
+  </div>
   <div class="row">
     <label>GitHub Repository URL</label>
     <input type="text" id="repoUrl" placeholder="https://github.com/owner/repo">
-    <div class="hint">Enter a public GitHub repo root. Files will be listed for selection before merging.</div>
+    <div class="hint">Enter a public GitHub repo root. Files listed via API, fetched via raw URLs.</div>
   </div>
-
   <div class="controls row">
     <label>Max file size (KB): <input type="number" id="maxKb" value="500" min="1"></label>
     <label><input type="checkbox" id="skipBinaries" checked> Skip likely binaries</label>
     <button id="loadRepoBtn">Load Repo Files</button>
   </div>
-
   <div class="select-actions" id="selectActions" style="display:none">
     <button class="secondary" id="selAll">Select All</button>
     <button class="secondary" id="selNone">Select None</button>
     <button class="secondary" id="selText">Text Only</button>
   </div>
-
   <div class="file-list" id="fileList"></div>
-
   <div class="row" id="mergeRepoRow" style="display:none">
     <button id="mergeRepoBtn">Merge Selected Files</button>
     <span class="hint" id="repoFileCount"></span>
@@ -175,14 +163,25 @@ https://raw.githubusercontent.com/user/repo/main/README.md"></textarea>
 const BINARY_EXT = /\.(png|jpe?g|gif|webp|ico|svg|pdf|zip|gz|tar|tgz|rar|7z|woff2?|ttf|eot|otf|mp3|mp4|webm|wasm|so|dll|exe|bin|lock|min\.js|min\.css|map)$/i;
 const BINARY_DIRS = /(^|\/)(node_modules|\.git|dist|build|\.next|coverage|vendor|\.idea|\.vscode)(\/|$)/i;
 
+const CORS_PROXIES = [
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+];
+let proxyIndex = 0;
+function getProxyUrl(url) {
+  const fn = CORS_PROXIES[proxyIndex % CORS_PROXIES.length];
+  return fn(url);
+}
+
 // ===================== STATE =====================
 let mergedText = '';
-let repoFiles = []; // {path, raw, size, isBinary}
+let repoFiles = [];
 
 // ===================== DOM =====================
 const statusEl = document.getElementById('status');
 const preview = document.getElementById('preview');
 const fileListEl = document.getElementById('fileList');
+const urlResultsEl = document.getElementById('urlResults');
 
 // ===================== TABS =====================
 document.querySelectorAll('.mode-tab').forEach(tab => {
@@ -197,7 +196,7 @@ document.querySelectorAll('.mode-tab').forEach(tab => {
 
 // ===================== HELPERS =====================
 function showStatus(msg, type) {
-  statusEl.textContent = msg;
+  statusEl.innerHTML = msg;
   statusEl.className = 'status ' + type;
   statusEl.style.display = 'block';
 }
@@ -212,16 +211,22 @@ function formatSize(bytes) {
 
 function isBinaryPath(path) { return BINARY_EXT.test(path) || BINARY_DIRS.test(path); }
 
-// GitHub URL → raw URL
+function classifyError(err, status) {
+  if (err && err.name === 'AbortError') return '⏱ Timeout';
+  if (err && err.message && err.message.includes('CORS')) return '🚫 CORS blocked';
+  if (err && err.message && err.message.includes('Failed to fetch')) return '🚫 CORS / Network blocked';
+  if (status === 403) return '🔒 403 Forbidden (bot protection?)';
+  if (status === 404) return '❌ 404 Not Found';
+  if (status >= 400) return `❌ HTTP ${status}`;
+  return '❌ ' + (err ? err.message : 'Unknown error');
+}
+
 function toRawGitHubUrl(input) {
   let u = input.trim();
   if (!u) return u;
   try {
     const url = new URL(u);
-    if (url.hostname === 'raw.githubusercontent.com') {
-      url.search = ''; url.hash = '';
-      return url.toString();
-    }
+    if (url.hostname === 'raw.githubusercontent.com') { url.search = ''; url.hash = ''; return url.toString(); }
     if (url.hostname === 'github.com') {
       const parts = url.pathname.split('/').filter(Boolean);
       if (parts[2] === 'blob' && parts.length >= 5) {
@@ -233,12 +238,18 @@ function toRawGitHubUrl(input) {
   return u;
 }
 
-// Fetch with timeout
+function resolveFetchUrl(raw, useProxy) {
+  if (!useProxy) return raw;
+  // GitHub raw usually works without proxy; only proxy non-GitHub
+  if (raw.startsWith('https://raw.githubusercontent.com/')) return raw;
+  return getProxyUrl(raw);
+}
+
 async function fetchWithTimeout(url, ms = 15000) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
   try {
-    const res = await fetch(url, { signal: ctrl.signal });
+    const res = await fetch(url, { signal: ctrl.signal, mode: 'cors' });
     clearTimeout(timer);
     return res;
   } catch (e) {
@@ -250,31 +261,45 @@ async function fetchWithTimeout(url, ms = 15000) {
 // ===================== URL MODE MERGE =====================
 document.getElementById('mergeUrlsBtn').onclick = async () => {
   clearStatus();
-  const rawUrls = document.getElementById('urls').value.split('\n').map(s => s.trim()).filter(Boolean);
-  if (!rawUrls.length) return showStatus('Enter at least one URL', 'error');
+  urlResultsEl.innerHTML = '';
+  const useProxy = document.getElementById('useProxy').checked;
+  const rawInputs = document.getElementById('urls').value.split('\n').map(s => s.trim()).filter(Boolean);
+  if (!rawInputs.length) return showStatus('Enter at least one URL', 'error');
 
-  const urls = rawUrls.map(toRawGitHubUrl);
+  const items = rawInputs.map(input => ({ original: input, raw: toRawGitHubUrl(input) }));
   preview.textContent = 'Loading…';
-  showStatus(`Fetching ${urls.length} file(s)…`, 'loading');
+  showStatus(`Fetching ${items.length} file(s)…`, 'loading');
 
-  try {
-    const contents = await Promise.all(urls.map(async (raw, i) => {
-      const res = await fetchWithTimeout(raw);
-      if (!res.ok) throw new Error(`HTTP ${res.status} for: ${rawUrls[i]}`);
+  let okCount = 0, failCount = 0;
+  const results = [];
+
+  for (let i = 0; i < items.length; i++) {
+    const { original, raw } = items[i];
+    const fetchUrl = resolveFetchUrl(raw, useProxy);
+    try {
+      const res = await fetchWithTimeout(fetchUrl);
+      if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
       const ct = res.headers.get('content-type') || '';
       if (ct.includes('image/') || ct.includes('application/octet-stream')) {
-        throw new Error(`Binary file skipped: ${rawUrls[i]}`);
+        throw new Error('Binary file skipped');
       }
       const text = await res.text();
-      return `\n\n/* ===== [${i + 1}] ${rawUrls[i]}\n       → ${raw} ===== */\n\n${text}`;
-    }));
-    mergedText = contents.join('\n');
-    preview.textContent = mergedText;
-    showStatus(`✅ Merged ${urls.length} file(s).`, 'success');
-  } catch (err) {
-    preview.textContent = 'Error.';
-    showStatus('❌ ' + err.message, 'error');
+      mergedText += `\n\n/* ===== [${i + 1}] ${original}\n       → ${raw} ===== */\n\n${text}`;
+      okCount++;
+      results.push(`<div class="result-item result-ok">✅ [${i + 1}] ${original}</div>`);
+    } catch (err) {
+      failCount++;
+      const label = classifyError(err, err.status);
+      results.push(`<div class="result-item result-err">❌ [${i + 1}] ${original}<br>&nbsp;&nbsp;${label}</div>`);
+      // Append placeholder in merged output so numbering stays consistent
+      mergedText += `\n\n/* ===== [${i + 1}] ${original}\n       → ${raw} ===== */\n/* FAILED: ${label} */\n`;
+    }
   }
+
+  urlResultsEl.innerHTML = results.join('');
+  preview.textContent = mergedText || 'No content merged.';
+  if (failCount === 0) showStatus(`✅ All ${okCount} file(s) merged.`, 'success');
+  else showStatus(`⚠️ ${okCount} merged, ${failCount} failed. See details below.`, failCount === items.length ? 'error' : 'loading');
 };
 
 // ===================== REPO MODE =====================
@@ -293,47 +318,32 @@ document.getElementById('loadRepoBtn').onclick = async () => {
   fileListEl.innerHTML = '';
 
   try {
-    // Get default branch
-    const metaRes = await fetchWithTimeout(
-      `https://api.github.com/repos/${owner}/${repo}`,
-      10000
-    );
-    if (!metaRes.ok) throw new Error(`Repo not found or API rate limited (${metaRes.status})`);
+    const metaRes = await fetchWithTimeout(`https://api.github.com/repos/${owner}/${repo}`, 10000);
+    if (!metaRes.ok) throw Object.assign(new Error(`Repo API ${metaRes.status}`), { status: metaRes.status });
     const meta = await metaRes.json();
     const branch = meta.default_branch;
 
-    // Get tree
     showStatus('Fetching file tree…', 'loading');
-    const treeRes = await fetchWithTimeout(
-      `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`,
-      15000
-    );
-    if (!treeRes.ok) throw new Error(`Tree API failed (${treeRes.status})`);
+    const treeRes = await fetchWithTimeout(`https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`, 15000);
+    if (!treeRes.ok) throw Object.assign(new Error(`Tree API ${treeRes.status}`), { status: treeRes.status });
     const tree = await treeRes.json();
-    if (tree.truncated) {
-      showStatus('⚠️ Repo too large — tree truncated. Some files omitted.', 'error');
-    }
+    if (tree.truncated) showStatus('⚠️ Repo truncated — some files omitted.', 'error');
 
-    // Filter
-    repoFiles = (tree.tree || [])
-      .filter(n => n.type === 'blob')
-      .map(n => ({
-        path: n.path,
-        raw: `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${encodeURI(n.path)}`,
-        size: n.size,
-        isBinary: isBinaryPath(n.path)
-      }))
-      .filter(n => !skipBin || !n.isBinary)
-      .filter(n => (n.size ?? 0) <= maxBytes);
+    repoFiles = (tree.tree || []).filter(n => n.type === 'blob').map(n => ({
+      path: n.path,
+      raw: `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${encodeURI(n.path)}`,
+      size: n.size,
+      isBinary: isBinaryPath(n.path)
+    })).filter(n => !skipBin || !n.isBinary).filter(n => (n.size ?? 0) <= maxBytes);
 
     if (!repoFiles.length) return showStatus('No text files found within size limit.', 'error');
-
     renderFileList();
     document.getElementById('selectActions').style.display = 'block';
     document.getElementById('mergeRepoRow').style.display = 'block';
     showStatus(`✅ Found ${repoFiles.length} file(s). Select and merge.`, 'success');
   } catch (err) {
-    showStatus('❌ ' + err.message, 'error');
+    const label = classifyError(err, err.status);
+    showStatus('❌ ' + label, 'error');
   }
 };
 
@@ -348,60 +358,47 @@ function renderFileList() {
   `).join('');
   updateRepoFileCount();
 }
-
 function updateRepoFileCount() {
   const checked = fileListEl.querySelectorAll('input[type="checkbox"]:checked').length;
   document.getElementById('repoFileCount').textContent = `${checked} file(s) selected`;
 }
-
 fileListEl.onchange = updateRepoFileCount;
 
-document.getElementById('selAll').onclick = () => {
-  fileListEl.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
-  updateRepoFileCount();
-};
-document.getElementById('selNone').onclick = () => {
-  fileListEl.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
-  updateRepoFileCount();
-};
-document.getElementById('selText').onclick = () => {
-  fileListEl.querySelectorAll('.file-item').forEach(row => {
-    const cb = row.querySelector('input[type="checkbox"]');
-    const badge = row.querySelector('.badge');
-    cb.checked = badge && badge.textContent === 'TXT';
-  });
-  updateRepoFileCount();
-};
+document.getElementById('selAll').onclick = () => { fileListEl.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true); updateRepoFileCount(); };
+document.getElementById('selNone').onclick = () => { fileListEl.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false); updateRepoFileCount(); };
+document.getElementById('selText').onclick = () => { fileListEl.querySelectorAll('.file-item').forEach(row => { const cb = row.querySelector('input[type="checkbox"]'); const badge = row.querySelector('.badge'); cb.checked = badge && badge.textContent === 'TXT'; }); updateRepoFileCount(); };
 
 document.getElementById('mergeRepoBtn').onclick = async () => {
   clearStatus();
-  const checked = [...fileListEl.querySelectorAll('input[type="checkbox"]:checked')]
-    .map(cb => repoFiles[parseInt(cb.dataset.idx)]);
+  const useProxy = document.getElementById('useProxyRepo').checked;
+  const checked = [...fileListEl.querySelectorAll('input[type="checkbox"]:checked')].map(cb => repoFiles[parseInt(cb.dataset.idx)]);
   if (!checked.length) return showStatus('Select at least one file.', 'error');
 
   preview.textContent = 'Loading…';
   showStatus(`Fetching ${checked.length} file(s)…`, 'loading');
 
-  let done = 0;
-  try {
-    const contents = await Promise.all(checked.map(async (f, i) => {
-      try {
-        const res = await fetchWithTimeout(f.raw);
-        if (!res.ok) return `\n\n/* ===== ${f.path} ===== */\n/* ❌ HTTP ${res.status} */\n`;
-        const text = await res.text();
-        done++;
-        return `\n\n/* ===== ${f.path} ===== */\n\n${text}`;
-      } catch (e) {
-        return `\n\n/* ===== ${f.path} ===== */\n/* ❌ ${e.message} */\n`;
-      }
-    }));
-    mergedText = contents.join('\n');
-    preview.textContent = mergedText;
-    showStatus(`✅ Merged ${done}/${checked.length} file(s) successfully.`, 'success');
-  } catch (err) {
-    preview.textContent = 'Error.';
-    showStatus('❌ ' + err.message, 'error');
+  let okCount = 0, failCount = 0;
+  mergedText = '';
+
+  for (let i = 0; i < checked.length; i++) {
+    const f = checked[i];
+    const fetchUrl = useProxy ? getProxyUrl(f.raw) : f.raw;
+    try {
+      const res = await fetchWithTimeout(fetchUrl);
+      if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
+      const text = await res.text();
+      mergedText += `\n\n/* ===== ${f.path} ===== */\n\n${text}`;
+      okCount++;
+    } catch (err) {
+      failCount++;
+      const label = classifyError(err, err.status);
+      mergedText += `\n\n/* ===== ${f.path} ===== */\n/* FAILED: ${label} */\n`;
+    }
   }
+
+  preview.textContent = mergedText;
+  if (failCount === 0) showStatus(`✅ Merged all ${okCount} file(s).`, 'success');
+  else showStatus(`⚠️ ${okCount} merged, ${failCount} failed.`, failCount === checked.length ? 'error' : 'loading');
 };
 
 // ===================== COPY / DOWNLOAD =====================
@@ -410,7 +407,6 @@ document.getElementById('copyBtn').onclick = async () => {
   await navigator.clipboard.writeText(mergedText);
   showStatus('📋 Copied to clipboard.', 'success');
 };
-
 document.getElementById('downloadBtn').onclick = () => {
   if (!mergedText) return showStatus('Nothing to download.', 'error');
   const name = document.getElementById('filename').value || 'merged.txt';
