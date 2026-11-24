@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Merge Files — URLs, GitHub Repos & Local</title>
 <style>
   * { box-sizing: border-box; }
@@ -9,38 +10,53 @@
   h1 { margin-top: 0; font-size: 1.4rem; }
   h2 { margin-bottom: 0.4rem; font-size: 1.1rem; }
   .container { max-width: 960px; margin: 0 auto; }
-  textarea, input[type="text"] { width: 100%; font-family: ui-monospace, monospace; padding: 0.6rem; border: 1px solid #ccc; border-radius: 6px; font-size: 0.9rem; }
+  textarea, input[type="text"], input[type="file"] { width: 100%; font-family: ui-monospace, monospace; padding: 0.6rem; border: 1px solid #ccc; border-radius: 6px; font-size: 0.9rem; }
   textarea { height: 130px; resize: vertical; }
-  button { padding: 0.5rem 1rem; margin-top: 0.5rem; margin-right: 0.3rem; cursor: pointer; border: none; border-radius: 6px; background: #2563eb; color: #fff; font-size: 0.85rem; font-weight: 500; }
+  button { padding: 0.5rem 1rem; margin-top: 0.5rem; margin-right: 0.3rem; cursor: pointer; border: none; border-radius: 6px; background: #2563eb; color: #fff; font-size: 0.85rem; font-weight: 500; transition: background 0.15s; }
   button:hover { background: #1d4ed8; }
   button.secondary { background: #6b7280; }
   button.secondary:hover { background: #4b5563; }
   button.small { padding: 0.25rem 0.5rem; font-size: 0.75rem; margin: 0; }
-  button.order-btn { background: #e5e7eb; color: #374151; padding: 0.15rem 0.35rem; font-size: 0.75rem; margin: 0 1px; }
-  button.order-btn:hover { background: #d1d5db; }
+  button.order-btn { background: transparent; color: #9ca3af; padding: 0.1rem 0.25rem; font-size: 0.8rem; margin: 0; border: 1px solid #e5e7eb; }
+  button.order-btn:hover { background: #f3f4f6; color: #374151; }
   button.order-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-  button.remove-btn { background: #ef4444; padding: 0.15rem 0.4rem; font-size: 0.7rem; margin: 0; }
+  button.remove-btn { background: #fee2e2; color: #dc2626; padding: 0.2rem 0.45rem; font-size: 0.7rem; margin: 0; border: none; border-radius: 4px; }
+  button.remove-btn:hover { background: #fecaca; }
+  button.zip-dl-btn { background: #059669; padding: 0.35rem 0.7rem; font-size: 0.78rem; }
+  button.zip-dl-btn:hover { background: #047857; }
   .row { margin-bottom: 1rem; }
   label { font-weight: 500; display: block; margin-bottom: 0.3rem; }
   .hint { font-size: 0.78rem; color: #666; margin-top: 0.2rem; }
   .hint code { background: #eee; padding: 1px 4px; border-radius: 3px; }
+  .hint a { color: #2563eb; cursor: pointer; text-decoration: underline; }
   .mode-tabs { display: flex; gap: 0.3rem; margin-bottom: 1rem; flex-wrap: wrap; }
-  .mode-tab { padding: 0.5rem 0.8rem; border: 1px solid #ccc; border-radius: 6px; cursor: pointer; background: #fff; font-size: 0.85rem; }
+  .mode-tab { padding: 0.5rem 0.8rem; border: 1px solid #ccc; border-radius: 6px; cursor: pointer; background: #fff; font-size: 0.85rem; transition: all 0.15s; }
+  .mode-tab:hover { background: #f0f4ff; }
   .mode-tab.active { background: #2563eb; color: #fff; border-color: #2563eb; }
   .panel { display: none; }
   .panel.active { display: block; }
   pre { background: #fff; padding: 1rem; border: 1px solid #ddd; border-radius: 6px; max-height: 420px; overflow: auto; white-space: pre-wrap; word-break: break-all; font-size: 0.82rem; }
-  .file-list { max-height: 420px; overflow: auto; border: 1px solid #ddd; border-radius: 6px; background: #fff; padding: 0.3rem; }
-  .file-item { display: flex; align-items: center; padding: 0.3rem 0.4rem; font-family: ui-monospace, monospace; font-size: 0.8rem; gap: 0.3rem; border-radius: 4px; }
-  .file-item:nth-child(odd) { background: #f9fafb; }
+  .file-list { max-height: 420px; overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; padding: 0; }
+  .file-item { display: flex; align-items: center; padding: 0.5rem 0.6rem; font-family: ui-monospace, monospace; font-size: 0.82rem; gap: 0.5rem; border-bottom: 1px solid #f0f0f0; transition: background 0.12s; }
+  .file-item:last-child { border-bottom: none; }
+  .file-item:hover { background: #f0f4ff; }
   .file-item.dragging { opacity: 0.5; background: #dbeafe; }
   .file-item.drag-over { border-top: 2px solid #2563eb; }
-  .drag-handle { color: #999; cursor: grab; user-select: none; flex-shrink: 0; }
-  .file-path { flex: 1; word-break: break-all; }
-  .file-size { color: #888; flex-shrink: 0; white-space: nowrap; }
-  .badge { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 99px; font-size: 0.7rem; font-weight: 500; flex-shrink: 0; }
+  .file-controls { display: flex; align-items: center; gap: 0.2rem; flex-shrink: 0; }
+  .drag-handle { color: #d1d5db; cursor: grab; user-select: none; font-size: 1rem; transition: color 0.15s; }
+  .drag-handle:hover { color: #6b7280; }
+  .file-checkbox { width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb; flex-shrink: 0; }
+  .file-path { flex: 1; word-break: break-all; min-width: 0; color: #1f2937; line-height: 1.4; }
+  .file-meta { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+  .file-size { color: #9ca3af; font-size: 0.73rem; white-space: nowrap; }
+  .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 99px; font-size: 0.67rem; font-weight: 600; letter-spacing: 0.03em; }
   .badge-text { background: #dbeafe; color: #1e40af; }
   .badge-bin { background: #fee2e2; color: #991b1b; }
+  @media (max-width: 600px) {
+    .file-item { flex-wrap: wrap; padding: 0.6rem; }
+    .file-path { width: 100%; order: 3; margin-top: 0.3rem; padding-left: 0; font-size: 0.78rem; }
+    .file-meta { margin-left: auto; }
+  }
   .controls { display: flex; gap: 0.8rem; align-items: center; flex-wrap: wrap; }
   .controls label { display: inline-flex; align-items: center; gap: 0.3rem; font-weight: 400; margin: 0; }
   .controls input[type="number"] { width: 80px; padding: 0.3rem; }
@@ -55,8 +71,16 @@
   .drop-zone.dragover { border-color: #2563eb; background: #eff6ff; }
   .binary-mode-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.8rem; flex-wrap: wrap; }
   .binary-mode-row select { padding: 0.3rem; border-radius: 4px; border: 1px solid #ccc; font-size: 0.82rem; }
-  .proxy-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.8rem; }
   .url-list-section { margin-top: 0.8rem; }
+  .log-section { margin-top: 0.8rem; display: none; }
+  .log-section pre { max-height: 250px; font-size: 0.75rem; background: #1a1a2e; color: #a5e895; }
+  .merge-btn-row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+  .progress-bar { width: 100%; height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden; margin-top: 0.5rem; display: none; }
+  .progress-bar-fill { height: 100%; background: #2563eb; width: 0%; transition: width 0.3s; }
+  .progress-bar-fill.zip { background: #059669; }
+  .zip-toolbar { display: none; align-items: center; gap: 0.5rem; margin-top: 0.5rem; padding: 0.5rem 0.7rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; font-size: 0.8rem; }
+  .zip-toolbar.show { display: flex; flex-wrap: wrap; }
+  .zip-toolbar .hint { margin: 0; color: #166534; }
 </style>
 </head>
 <body>
@@ -70,7 +94,6 @@
 
 <!-- URL MODE -->
 <div class="panel active" id="panel-urls">
-  <div class="proxy-row"><input type="checkbox" id="useProxy"><label for="useProxy">🌐 Use CORS proxy</label></div>
   <div class="row"><label>File URLs (one per line)</label>
     <textarea id="urls" placeholder="https://github.com/user/repo/blob/main/a.js&#10;https://raw.githubusercontent.com/user/repo/main/README.md"></textarea>
   </div>
@@ -85,20 +108,19 @@
   <div class="url-list-section" id="urlListSection" style="display:none">
     <div class="sort-controls"><span class="hint">Drag ⠿ or use ↑↓ to reorder:</span></div>
     <div class="file-list" id="urlOrderList"></div>
-    <div class="row"><button id="remixUrlBtn">🔄 Re-merge in Order</button></div>
+    <div class="row"><button id="remixUrlBtn" class="secondary">🔄 Re-merge in Order</button></div>
   </div>
 </div>
 
 <!-- REPO MODE -->
 <div class="panel" id="panel-repo">
-  <div class="proxy-row"><input type="checkbox" id="useProxyRepo"><label for="useProxyRepo">🌐 Use CORS proxy</label></div>
   <div class="row"><label>GitHub Repository URL</label>
-    <input type="text" id="repoUrl" placeholder="https://github.com/owner/repo or .../tree/v1.0.0">
-    <div class="hint">Supports: root, <code>/tree/</code>, <code>/commit/</code>, <code>/archive/refs/tags/</code></div>
+    <input type="text" id="repoUrl" placeholder="https://github.com/owner/repo or .../tree/v1.0.0 or .../commit/abc123">
+    <div class="hint">Supports: root, <code>/tree/&lt;branch|tag&gt;</code>, <code>/commit/&lt;sha&gt;</code></div>
   </div>
   <div class="controls row">
     <label>Max KB: <input type="number" id="maxKb" value="500" min="1"></label>
-    <label><input type="checkbox" id="skipBinaries"> Auto-skip binaries</label>
+    <label><input type="checkbox" id="skipBinaries" checked> Auto-skip binaries</label>
   </div>
   <div class="binary-mode-row"><label>Binary:</label>
     <select id="repoBinaryMode">
@@ -108,6 +130,14 @@
     </select>
   </div>
   <button id="loadRepoBtn">Load Repo Files</button>
+
+  <!-- ZIP toolbar: appears after repo loads -->
+  <div class="zip-toolbar" id="zipToolbar">
+    <span class="hint">📦 Large repo? Download the full archive:</span>
+    <button class="zip-dl-btn" id="downloadZipBtn">⬇️ Download Repo Zip</button>
+    <span class="hint">then switch to <a onclick="document.querySelectorAll('.mode-tab')[2].click()">Local Files</a> and upload it there.</span>
+  </div>
+
   <div class="select-actions" id="selectActions" style="display:none">
     <button class="secondary small" id="selAll">All</button>
     <button class="secondary small" id="selNone">None</button>
@@ -125,12 +155,22 @@
     </select>
   </div>
   <div class="file-list" id="fileList"></div>
-  <div class="row" id="mergeRepoRow" style="display:none"><button id="mergeRepoBtn">Merge Selected</button><span class="hint" id="repoFileCount"></span></div>
+  <div class="row" id="mergeRepoRow" style="display:none">
+    <div class="merge-btn-row">
+      <button id="mergeRepoBtn">Merge Selected (per-file)</button>
+    </div>
+    <div class="hint" id="repoFileCount" style="margin-top:0.5rem"></div>
+  </div>
 </div>
 
 <!-- LOCAL MODE -->
 <div class="panel" id="panel-local">
-  <div class="drop-zone" id="dropZone"><p>📂 Drag & drop files here, or</p><input type="file" id="fileInput" multiple style="display:none"><button type="button" onclick="document.getElementById('fileInput').click()">Choose Files</button></div>
+  <div class="drop-zone" id="dropZone">
+    <p>📂 Drag & drop files or zip archives here, or</p>
+    <input type="file" id="fileInput" multiple style="display:none">
+    <button type="button" class="secondary" onclick="document.getElementById('fileInput').click()">Choose Files</button>
+    <div class="hint" style="margin-top:0.5rem;">You can also upload a <b>.zip</b> downloaded from GitHub — it will be extracted automatically.</div>
+  </div>
   <div class="binary-mode-row"><label>Binary:</label>
     <select id="localBinaryMode">
       <option value="skip">Skip</option>
@@ -157,6 +197,7 @@
     <button class="remove-btn" id="localClearAll">Clear All</button>
   </div>
   <div class="file-list" id="localFileList"></div>
+  <div class="progress-bar" id="zipExtractProgress" style="display:none"><div class="progress-bar-fill zip" id="zipExtractProgressFill"></div></div>
   <div class="row" id="mergeLocalRow" style="display:none"><button id="mergeLocalBtn">Merge Selected</button><span class="hint" id="localMergeCount"></span></div>
 </div>
 
@@ -164,25 +205,38 @@
 <div class="row"><label>Output Filename</label><input type="text" id="filename" value="merged.txt"></div>
 <h2>Preview</h2>
 <pre id="preview">Merged content will appear here…</pre>
-<div class="row"><button id="copyBtn">📋 Copy</button><button id="downloadBtn">💾 Download</button><span class="hint" id="outputSize"></span></div>
+<div class="row"><button id="copyBtn">📋 Copy</button><button id="downloadBtn">💾 Download</button><button id="saveLogBtn" style="display:none">📋 Save Log</button><span class="hint" id="outputSize"></span></div>
+
+<div class="log-section" id="logSection">
+  <h2>📋 Merge Log</h2>
+  <pre id="logPreview"></pre>
+</div>
 </div>
 
 <script>
-// ===================== CONSTANTS =====================
+// ===================== CONSTANTS & STATE =====================
+const MAX_EXTRACT_SIZE = 2 * 1024 * 1024; // 2 MB per file — zip-bomb guard
 const BINARY_EXT = /\.(png|jpe?g|gif|webp|ico|svg|pdf|zip|gz|tar|tgz|rar|7z|woff2?|ttf|eot|otf|mp3|mp4|webm|wasm|so|dll|exe|bin|lock|min\.js|min\.css|map)$/i;
 const BINARY_DIRS = /(^|\/)(node_modules|\.git|dist|build|\.next|coverage|vendor|\.idea|\.vscode)(\/|$)/i;
-const CORS_PROXIES = [u => `https://corsproxy.io/?${encodeURIComponent(u)}`, u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`];
-let proxyIdx = 0;
-const getProxy = u => CORS_PROXIES[proxyIdx % CORS_PROXIES.length](u);
-
-// ===================== STATE =====================
-let mergedText = '';
-let repoFiles = [];
-let localFiles = [];
-let urlData = []; // {original, raw, ok, isBinary, size, mime, content, checked}
-
-// ===================== HELPERS =====================
 const statusEl = document.getElementById('status'), preview = document.getElementById('preview');
+let currentLog = '', mergedText = '';
+let repoFiles = [], localFiles = [], urlData = [];
+let repoMeta = { owner: '', repo: '', ref: '', archiveRef: '' };
+
+// ===================== LAZY JSZIP LOADER =====================
+function loadJSZip() {
+  return new Promise((resolve, reject) => {
+    if (window.JSZip) { resolve(window.JSZip); return; }
+    showStatus('📦 Loading zip support (JSZip)...', 'loading');
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    script.onload = () => { clearStatus(); resolve(window.JSZip); };
+    script.onerror = () => { reject(new Error('Failed to load JSZip library')); };
+    document.head.appendChild(script);
+  });
+}
+
+// ===================== UTILITIES =====================
 function showStatus(m, t) { statusEl.innerHTML = m; statusEl.className = 'status ' + t; statusEl.style.display = 'block'; }
 function clearStatus() { statusEl.style.display = 'none'; }
 function fmtSize(b) { return !b && b !== 0 ? '' : b < 1024 ? b + ' B' : b < 1048576 ? (b/1024).toFixed(1)+' KB' : (b/1048576).toFixed(2)+' MB'; }
@@ -197,8 +251,38 @@ function binEntry(path, size, mime, b64, mode) {
   return `\n\n/* ===== ${path} (BINARY, base64, ${fmtSize(size)}, ${mime}) ===== */\n${wrapB64(b64)}\n`;
 }
 
-// ===================== SHARED DRAG HANDLERS =====================
-// Call this on any container with [data-idx] children that have .drag-handle
+async function copyToClipboard(text) {
+  if (!text) return;
+  let success = false;
+  if (navigator.clipboard && window.isSecureContext) {
+    try { await navigator.clipboard.writeText(text); success = true; } catch(e) {}
+  }
+  if (!success) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.cssText = 'position:fixed;opacity:0;left:-9999px;top:0';
+      document.body.appendChild(ta); ta.focus(); ta.select(); ta.setSelectionRange(0, text.length);
+      success = document.execCommand('copy'); document.body.removeChild(ta);
+    } catch(e) {}
+  }
+  showStatus(success ? '📋 Copied to clipboard' : '❌ Copy failed — please select & copy manually', success ? 'success' : 'error');
+}
+
+function generateLog(entries, source) {
+  const ts = new Date().toISOString().replace('T',' ').slice(0,19);
+  const ok = entries.filter(e => e.ok), fail = entries.filter(e => !e.ok);
+  let log = `=== MERGE LOG ===\nTimestamp : ${ts}\nSource    : ${source}\nTotal     : ${entries.length}\nMerged    : ${ok.length}\nFailed    : ${fail.length}\nOutput    : ${document.getElementById('filename').value}\n`;
+  log += `\n--- SUCCESSFULLY MERGED (${ok.length}) ---\n`;
+  ok.forEach((e, i) => { log += `  ${i+1}. ${e.path}\n     Size: ${fmtSize(e.size)} | Type: ${e.isBinary ? 'BINARY' : 'TEXT'}\n`; });
+  log += `\n--- FAILED (${fail.length}) ---\n`;
+  fail.forEach((e, i) => { log += `  ${i+1}. ${e.path}\n     Error: ${e.error || 'Unknown'}\n`; });
+  log += `=== END LOG ===\n`;
+  currentLog = log;
+  document.getElementById('logPreview').textContent = log;
+  document.getElementById('logSection').style.display = 'block';
+  document.getElementById('saveLogBtn').style.display = 'inline-block';
+}
+
 function enableDragSort(container, onReorder) {
   let dragIdx = null;
   container.querySelectorAll('.file-item').forEach(item => {
@@ -211,7 +295,6 @@ function enableDragSort(container, onReorder) {
       handle.ondrop = e => { e.preventDefault(); item.classList.remove('drag-over'); if (dragIdx !== null && dragIdx !== i) onReorder(dragIdx, i); };
       handle.ondragend = () => { item.classList.remove('dragging'); dragIdx = null; };
     }
-    // Touch support on handle
     if (handle) {
       let timer, sy;
       handle.ontouchstart = e => { sy = e.touches[0].clientY; timer = setTimeout(() => { dragIdx = i; item.classList.add('dragging'); if(navigator.vibrate)navigator.vibrate(50); }, 350); };
@@ -219,13 +302,12 @@ function enableDragSort(container, onReorder) {
       handle.ontouchend = e => { clearTimeout(timer); if(dragIdx !== null) { const t = document.elementFromPoint(e.changedTouches[0].clientX, e.changedTouches[0].clientY); const drop = t?.closest('.file-item'); if(drop) onReorder(dragIdx, parseInt(drop.dataset.idx)); container.querySelectorAll('.file-item').forEach(el => { el.classList.remove('dragging'); el.classList.remove('drag-over'); }); dragIdx = null; } };
     }
   });
-  // ↑↓ buttons
   container.querySelectorAll('.order-btn').forEach(btn => {
     btn.onclick = () => onReorder(parseInt(btn.dataset.idx), btn.dataset.move === 'up' ? parseInt(btn.dataset.idx) - 1 : parseInt(btn.dataset.idx) + 1);
   });
 }
 
-// ===================== TABS =====================
+// Tab switching
 document.querySelectorAll('.mode-tab').forEach(t => t.onclick = () => {
   document.querySelectorAll('.mode-tab,.panel').forEach(el => el.classList.remove('active'));
   t.classList.add('active'); document.getElementById('panel-' + t.dataset.mode).classList.add('active'); clearStatus();
@@ -236,177 +318,275 @@ function renderUrlList() {
   const el = document.getElementById('urlOrderList');
   el.innerHTML = urlData.map((u, i) => `
     <div class="file-item" data-idx="${i}">
-      <span class="drag-handle" title="Drag" draggable="true">⠿</span>
-      <button class="order-btn" data-move="up" data-idx="${i}" ${i===0?'disabled':''}>↑</button>
-      <button class="order-btn" data-move="down" data-idx="${i}" ${i===urlData.length-1?'disabled':''}>↓</button>
-      <input type="checkbox" class="url-cb" data-idx="${i}" ${u.checked ? 'checked' : ''}>
+      <div class="file-controls">
+        <span class="drag-handle" title="Drag to reorder" draggable="true">⠿</span>
+        <button class="order-btn" data-move="up" data-idx="${i}" ${i===0?'disabled':''} title="Move up">↑</button>
+        <button class="order-btn" data-move="down" data-idx="${i}" ${i===urlData.length-1?'disabled':''} title="Move down">↓</button>
+        <input type="checkbox" class="file-checkbox url-cb" data-idx="${i}" ${u.checked ? 'checked' : ''}>
+      </div>
       <span class="file-path">${u.original}</span>
-      <span class="file-size">${fmtSize(u.size)}</span>
-      <span class="badge ${u.isBinary ? 'badge-bin' : 'badge-text'}">${u.isBinary ? 'BIN' : 'TXT'}</span>
+      <div class="file-meta"><span class="file-size">${fmtSize(u.size)}</span><span class="badge ${u.isBinary?'badge-bin':'badge-text'}">${u.isBinary?'BIN':'TXT'}</span></div>
     </div>`).join('');
-  enableDragSort(el, (from, to) => { const m = urlData.splice(from, 1)[0]; urlData.splice(to, 0, m); renderUrlList(); });
-  // checkbox changes
+  enableDragSort(el, (from, to) => { const m = urlData.splice(from,1)[0]; urlData.splice(to,0,m); renderUrlList(); });
   el.querySelectorAll('.url-cb').forEach(cb => cb.onchange = () => { urlData[parseInt(cb.dataset.idx)].checked = cb.checked; });
 }
-
 function buildUrlMerge() {
   const mode = document.getElementById('urlBinaryMode').value;
-  mergedText = '';
-  urlData.filter(u => u.checked).forEach(u => {
-    if (!u.ok) { mergedText += `\n\n/* ===== ${u.original} ===== */\n/* FAILED */\n`; }
-    else if (u.isBinary) { mergedText += binEntry(u.original, u.size, u.mime, u.content, mode); }
-    else { mergedText += `\n\n/* ===== ${u.original} ===== */\n\n${u.content}`; }
+  mergedText = ''; let ok = 0, fail = 0; const logEntries = [];
+  urlData.filter(u=>u.checked).forEach(u => {
+    if (!u.ok) { mergedText += `\n\n/* ===== ${u.original} ===== */\n/* FAILED */\n`; fail++; logEntries.push({path:u.original,ok:false,size:u.size,error:u.error,isBinary:u.isBinary}); }
+    else if (u.isBinary) { mergedText += binEntry(u.original,u.size,u.mime,u.content,mode); ok++; logEntries.push({path:u.original,ok:true,size:u.size,mime:u.mime,isBinary:true}); }
+    else { mergedText += `\n\n/* ===== ${u.original} ===== */\n\n${u.content}`; ok++; logEntries.push({path:u.original,ok:true,size:u.size,mime:u.mime,isBinary:false}); }
   });
-  preview.textContent = mergedText;
-  document.getElementById('outputSize').textContent = fmtSize(new Blob([mergedText]).size);
+  preview.textContent = mergedText; document.getElementById('outputSize').textContent = fmtSize(new Blob([mergedText]).size);
+  generateLog(logEntries, 'URL List');
+  showStatus(`✅ ${ok} merged, ❌ ${fail} failed`, fail?'error':'success');
 }
-
 document.getElementById('mergeUrlsBtn').onclick = async () => {
   clearStatus();
-  const inputs = document.getElementById('urls').value.split('\n').map(s => s.trim()).filter(Boolean);
-  if (!inputs.length) return showStatus('Enter URLs', 'error');
+  const inputs = document.getElementById('urls').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  if (!inputs.length) return showStatus('Enter URLs','error');
   const mode = document.getElementById('urlBinaryMode').value;
-  const useProxy = document.getElementById('useProxy').checked;
-  urlData = inputs.map(u => ({ original: u, raw: toRaw(u), ok: false, isBinary: false, size: 0, mime: '', content: null, checked: true }));
-  preview.textContent = 'Loading…'; showStatus(`Fetching ${inputs.length}…`, 'loading');
-  
-  for (let i = 0; i < urlData.length; i++) {
-    const u = urlData[i];
+  urlData = inputs.map(u=>({original:u,raw:toRaw(u),ok:false,isBinary:false,size:0,mime:'',content:null,checked:true}));
+  preview.textContent='Loading…'; showStatus(`Fetching ${inputs.length}…`,'loading');
+  for (let i=0;i<urlData.length;i++) {
+    const u=urlData[i];
     try {
-      const res = await fetch(useProxy && !u.raw.includes('raw.githubusercontent') ? getProxy(u.raw) : u.raw, { signal: AbortSignal.timeout(15000) });
-      if (!res.ok) throw new Error(res.status);
-      const ct = res.headers.get('content-type') || '';
-      const buf = await res.arrayBuffer();
-      u.size = buf.byteLength; u.mime = mimeOf(u.original);
-      u.isBinary = isBin(u.original) || /image|octet|pdf|zip/.test(ct);
-      if (u.isBinary && mode !== 'base64') u.ok = true;
-      else if (u.isBinary) { u.content = arrToB64(buf); u.ok = true; }
-      else { u.content = new TextDecoder().decode(buf); u.ok = true; }
-    } catch(e) { u.error = e.message; }
+      const res=await fetch(u.raw,{signal:AbortSignal.timeout(15000)});
+      if(!res.ok)throw new Error('HTTP '+res.status);
+      const ct=res.headers.get('content-type')||'';
+      const buf=await res.arrayBuffer();
+      u.size=buf.byteLength; u.mime=mimeOf(u.original);
+      u.isBinary=isBin(u.original)||/image|octet|pdf|zip/.test(ct);
+      if(u.isBinary&&mode!=='base64'){u.ok=true;}
+      else if(u.isBinary){u.content=arrToB64(buf);u.ok=true;}
+      else{u.content=new TextDecoder().decode(buf);u.ok=true;}
+    }catch(e){u.error=e.message;}
   }
-  
-  document.getElementById('urlListSection').style.display = 'block';
-  renderUrlList();
-  buildUrlMerge();
-  showStatus(`✅ ${urlData.filter(u=>u.ok).length}/${urlData.length} loaded`, 'success');
+  document.getElementById('urlListSection').style.display='block';
+  renderUrlList(); buildUrlMerge();
+  const okc=urlData.filter(u=>u.ok).length;
+  showStatus(`✅ ${okc}/${urlData.length} fetched, ❌ ${urlData.length-okc} failed`,okc===urlData.length?'success':'error');
 };
-
-document.getElementById('remixUrlBtn').onclick = buildUrlMerge;
-document.getElementById('urlBinaryMode').onchange = () => { if (urlData.length) buildUrlMerge(); };
+document.getElementById('remixUrlBtn').onclick=buildUrlMerge;
+document.getElementById('urlBinaryMode').onchange=()=>{if(urlData.length)buildUrlMerge();};
 
 // ===================== REPO MODE =====================
 function renderRepoList() {
-  const el = document.getElementById('fileList');
-  el.innerHTML = repoFiles.map((f, i) => `
+  const el=document.getElementById('fileList');
+  el.innerHTML=repoFiles.map((f,i)=>`
     <div class="file-item" data-idx="${i}">
-      <span class="drag-handle" title="Drag" draggable="true">⠿</span>
-      <button class="order-btn" data-move="up" data-idx="${i}" ${i===0?'disabled':''}>↑</button>
-      <button class="order-btn" data-move="down" data-idx="${i}" ${i===repoFiles.length-1?'disabled':''}>↓</button>
-      <input type="checkbox" class="repo-cb" data-idx="${i}" ${f.checked ? 'checked' : ''}>
+      <div class="file-controls">
+        <span class="drag-handle" title="Drag to reorder" draggable="true">⠿</span>
+        <button class="order-btn" data-move="up" data-idx="${i}" ${i===0?'disabled':''}>↑</button>
+        <button class="order-btn" data-move="down" data-idx="${i}" ${i===repoFiles.length-1?'disabled':''}>↓</button>
+        <input type="checkbox" class="file-checkbox repo-cb" data-idx="${i}" ${f.checked?'checked':''}>
+      </div>
       <span class="file-path">${f.path}</span>
-      <span class="file-size">${fmtSize(f.size)}</span>
-      <span class="badge ${f.isBinary ? 'badge-bin' : 'badge-text'}">${f.isBinary ? 'BIN' : 'TXT'}</span>
+      <div class="file-meta"><span class="file-size">${fmtSize(f.size)}</span><span class="badge ${f.isBinary?'badge-bin':'badge-text'}">${f.isBinary?'BIN':'TXT'}</span></div>
     </div>`).join('');
-  enableDragSort(el, (from, to) => { const m = repoFiles.splice(from, 1)[0]; repoFiles.splice(to, 0, m); renderRepoList(); });
-  el.querySelectorAll('.repo-cb').forEach(cb => cb.onchange = () => { repoFiles[parseInt(cb.dataset.idx)].checked = cb.checked; updateRepoCount(); });
+  enableDragSort(el,(from,to)=>{const m=repoFiles.splice(from,1)[0];repoFiles.splice(to,0,m);renderRepoList();});
+  el.querySelectorAll('.repo-cb').forEach(cb=>cb.onchange=()=>{repoFiles[parseInt(cb.dataset.idx)].checked=cb.checked;updateRepoCount();});
   updateRepoCount();
 }
-function updateRepoCount() { document.getElementById('repoFileCount').textContent = `${repoFiles.filter(f=>f.checked).length} selected`; }
+function updateRepoCount(){document.getElementById('repoFileCount').textContent=`${repoFiles.filter(f=>f.checked).length} selected`;}
 
-document.getElementById('loadRepoBtn').onclick = async () => {
+document.getElementById('loadRepoBtn').onclick=async()=>{
   clearStatus();
-  const input = document.getElementById('repoUrl').value.trim();
-  if (!input) return showStatus('Enter repo URL', 'error');
-  let owner, repo, ref = null;
-  try { const url = new URL(input); const p = url.pathname.split('/').filter(Boolean); owner = p[0]; repo = p[1].replace(/\.git$/,'');
-    if (p[2] === 'tree' && p[3]) ref = p[3]; else if (p[2] === 'archive' && p[4] === 'tags' && p[5]) ref = p[5]; else if (p[2] === 'archive' && p[4] === 'heads' && p[5]) ref = p[5];
-  } catch(e) { return showStatus('Invalid URL', 'error'); }
-  showStatus('Loading…', 'loading');
-  const meta = await fetch(`https://api.github.com/repos/${owner}/${repo}`).then(r => r.json());
-  if (!ref) ref = meta.default_branch;
-  const tree = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(ref)}?recursive=1`).then(r => r.json());
-  const maxB = (parseInt(document.getElementById('maxKb').value) || 500) * 1024;
-  const skipBin = document.getElementById('skipBinaries').checked;
-  repoFiles = (tree.tree || []).filter(n => n.type === 'blob' && (n.size||0) <= maxB).map(n => ({ path: n.path, raw: `https://raw.githubusercontent.com/${owner}/${repo}/${encodeURIComponent(ref)}/${encodeURI(n.path)}`, size: n.size, isBinary: isBin(n.path), checked: !isBin(n.path) || !skipBin }));
-  document.getElementById('selectActions').style.display = 'flex';
-  document.getElementById('repoSortControls').style.display = 'flex';
-  document.getElementById('mergeRepoRow').style.display = 'block';
-  renderRepoList();
-  showStatus(`✅ ${repoFiles.length} files`, 'success');
+  const input=document.getElementById('repoUrl').value.trim();
+  if(!input)return showStatus('Enter repo URL','error');
+  let owner,repo,ref=null;
+  try{
+    const url=new URL(input);
+    const p=url.pathname.split('/').filter(Boolean);
+    owner=p[0];repo=p[1].replace(/\.git$/,'');
+    if(p[2]==='tree'&&p[3])ref=p[3];
+    else if(p[2]==='commit'&&p[3])ref=p[3];
+    else if(p[2]==='archive'&&p[4]==='tags'&&p[5])ref=p[5];
+    else if(p[2]==='archive'&&p[4]==='heads'&&p[5])ref=p[5];
+  }catch(e){return showStatus('Invalid URL','error');}
+  showStatus('Loading…','loading');
+  try{
+    const metaRes=await fetch(`https://api.github.com/repos/${owner}/${repo}`);
+    const meta=await metaRes.json();
+    if(!ref)ref=meta.default_branch;
+    let archiveRef=ref;
+    try{
+      const commitRes=await fetch(`https://api.github.com/repos/${owner}/${repo}/commits/${encodeURIComponent(ref)}`);
+      if(commitRes.ok){const cd=await commitRes.json();archiveRef=cd.sha;}
+    }catch(_){}
+    const treeRes=await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(ref)}?recursive=1`);
+    const tree=await treeRes.json();
+    if(tree.message)throw new Error(tree.message);
+    const maxB=(parseInt(document.getElementById('maxKb').value)||500)*1024;
+    const skipBin=document.getElementById('skipBinaries').checked;
+    repoFiles=(tree.tree||[]).filter(n=>n.type==='blob'&&(n.size||0)<=maxB).map(n=>({path:n.path,raw:`https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${encodeURI(n.path)}`,size:n.size,isBinary:isBin(n.path),checked:!isBin(n.path)||!skipBin}));
+    repoMeta={owner,repo,ref,archiveRef};
+    document.getElementById('selectActions').style.display='flex';
+    document.getElementById('repoSortControls').style.display='flex';
+    document.getElementById('mergeRepoRow').style.display='block';
+    document.getElementById('zipToolbar').classList.add('show');
+    renderRepoList();
+    showStatus(`✅ ${repoFiles.length} files loaded (ref: ${archiveRef.substring(0,8)})`,'success');
+  }catch(e){showStatus('❌ '+e.message,'error');}
 };
 
-document.getElementById('repoSortBy').onchange = e => { const v = e.target.value; if (v === 'custom') return; repoFiles.sort((a,b) => v.includes('asc') ? a.path.localeCompare(b.path) : b.path.localeCompare(a.path)); renderRepoList(); };
-document.getElementById('selAll').onclick = () => { repoFiles.forEach(f=>f.checked=true); renderRepoList(); };
-document.getElementById('selNone').onclick = () => { repoFiles.forEach(f=>f.checked=false); renderRepoList(); };
-document.getElementById('selText').onclick = () => { repoFiles.forEach(f=>f.checked=!f.isBinary); renderRepoList(); };
-document.getElementById('selBin').onclick = () => { repoFiles.forEach(f=>f.checked=true); renderRepoList(); };
+document.getElementById('repoSortBy').onchange=e=>{const v=e.target.value;if(v==='custom')return;repoFiles.sort((a,b)=>v.includes('asc')?a.path.localeCompare(b.path):b.path.localeCompare(a.path));renderRepoList();};
+document.getElementById('selAll').onclick=()=>{repoFiles.forEach(f=>f.checked=true);renderRepoList();};
+document.getElementById('selNone').onclick=()=>{repoFiles.forEach(f=>f.checked=false);renderRepoList();};
+document.getElementById('selText').onclick=()=>{repoFiles.forEach(f=>f.checked=!f.isBinary);renderRepoList();};
+document.getElementById('selBin').onclick=()=>{repoFiles.forEach(f=>f.checked=true);renderRepoList();};
 
-document.getElementById('mergeRepoBtn').onclick = async () => {
-  const sel = repoFiles.filter(f => f.checked); if (!sel.length) return showStatus('Select files', 'error');
-  const mode = document.getElementById('repoBinaryMode').value, useProxy = document.getElementById('useProxyRepo').checked;
-  preview.textContent = 'Loading…'; showStatus(`Fetching ${sel.length}…`, 'loading'); mergedText = '';
-  for (const f of sel) {
-    try { const res = await fetch(useProxy ? getProxy(f.raw) : f.raw, { signal: AbortSignal.timeout(15000) }); if (!res.ok) throw new Error(res.status);
-      const buf = await res.arrayBuffer();
-      if (f.isBinary) mergedText += binEntry(f.path, f.size, mimeOf(f.path), arrToB64(buf), mode);
-      else mergedText += `\n\n/* ===== ${f.path} ===== */\n\n${new TextDecoder().decode(buf)}`;
-    } catch(e) { mergedText += `\n\n/* ===== ${f.path} ===== */\n/* FAILED */\n`; }
+// --- Download Repo Zip button ---
+document.getElementById('downloadZipBtn').onclick = () => {
+  const { owner, repo, archiveRef } = repoMeta;
+  if (!owner || !repo) return showStatus('❌ Repo info missing. Load repo first.', 'error');
+  const zipUrl = `https://github.com/${owner}/${repo}/archive/${archiveRef}.zip`;
+  const a = document.createElement('a');
+  a.href = zipUrl;
+  a.download = `${repo}-${archiveRef.substring(0,8)}.zip`;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  showStatus('⬇️ Download started. After it finishes, switch to <b>Local Files</b> and upload the zip.', 'success');
+};
+
+document.getElementById('mergeRepoBtn').onclick=async()=>{
+  const sel=repoFiles.filter(f=>f.checked);if(!sel.length)return showStatus('Select files','error');
+  const mode=document.getElementById('repoBinaryMode').value;
+  preview.textContent='Loading…';showStatus(`Fetching ${sel.length} files…`,'loading');mergedText='';
+  let ok=0,fail=0;const logEntries=[];
+  for(const f of sel){
+    try{
+      const res=await fetch(f.raw,{signal:AbortSignal.timeout(15000)});
+      if(!res.ok)throw new Error('HTTP '+res.status);
+      const buf=await res.arrayBuffer();
+      if(f.isBinary){mergedText+=binEntry(f.path,f.size,mimeOf(f.path),arrToB64(buf),mode);}
+      else{mergedText+=`\n\n/* ===== ${f.path} ===== */\n\n${new TextDecoder().decode(buf)}`;}
+      ok++;logEntries.push({path:f.path,ok:true,size:f.size,mime:mimeOf(f.path),isBinary:f.isBinary});
+    }catch(e){mergedText+=`\n\n/* ===== ${f.path} ===== */\n/* FAILED: ${e.message} */\n`;fail++;logEntries.push({path:f.path,ok:false,size:f.size,error:e.message,isBinary:f.isBinary});}
   }
-  preview.textContent = mergedText; document.getElementById('outputSize').textContent = fmtSize(new Blob([mergedText]).size); showStatus('✅ Done', 'success');
+  preview.textContent=mergedText;document.getElementById('outputSize').textContent=fmtSize(new Blob([mergedText]).size);
+  generateLog(logEntries,'GitHub Repo (per-file): '+document.getElementById('repoUrl').value);
+  showStatus(`✅ ${ok} merged, ❌ ${fail} failed`,fail?'error':'success');
 };
 
-// ===================== LOCAL MODE =====================
-const dz = document.getElementById('dropZone'); let dc = 0;
-dz.ondragenter = e => { e.preventDefault(); dc++; dz.classList.add('dragover'); };
-dz.ondragover = e => e.preventDefault();
-dz.ondragleave = () => { dc--; if(!dc) dz.classList.remove('dragover'); };
-dz.ondrop = e => { e.preventDefault(); dc=0; dz.classList.remove('dragover'); addLocal([...e.dataTransfer.files]); };
-document.getElementById('fileInput').onchange = e => { addLocal([...e.target.files]); e.target.value=''; };
+// ===================== LOCAL MODE (with ZIP support) =====================
+const dz=document.getElementById('dropZone');let dc=0;
+dz.ondragenter=e=>{e.preventDefault();dc++;dz.classList.add('dragover');};
+dz.ondragover=e=>e.preventDefault();
+dz.ondragleave=()=>{dc--;if(!dc)dz.classList.remove('dragover');};
+dz.ondrop=async e=>{e.preventDefault();dc=0;dz.classList.remove('dragover');await handleLocalFiles([...e.dataTransfer.files]);};
+document.getElementById('fileInput').onchange=async e=>{await handleLocalFiles([...e.target.files]);e.target.value='';};
 
-function addLocal(files) { for (const f of files) if (!localFiles.some(x => x.name===f.name && x.size===f.size)) localFiles.push({ file: f, name: f.name, size: f.size, isBinary: isBin(f.name), checked: !isBin(f.name) }); renderLocal(); }
+async function handleLocalFiles(files) {
+  for (const f of files) {
+    if (f.name.toLowerCase().endsWith('.zip')) {
+      await extractZipAndAdd(f);
+    } else {
+      if (!localFiles.some(x => x.name===f.name && x.size===f.size)) {
+        localFiles.push({ file: f, name: f.name, size: f.size, isBinary: isBin(f.name), checked: !isBin(f.name) });
+      }
+    }
+  }
+  renderLocal();
+}
+
+async function extractZipAndAdd(zipFile) {
+  try {
+    const JSZip = await loadJSZip();
+    const progressBar = document.getElementById('zipExtractProgress');
+    const progressFill = document.getElementById('zipExtractProgressFill');
+    progressBar.style.display = 'block'; progressFill.style.width = '10%';
+    showStatus(`📦 Extracting ${zipFile.name}…`, 'loading');
+    const zipBuf = await zipFile.arrayBuffer();
+    progressFill.style.width = '30%';
+    const zip = await JSZip.loadAsync(zipBuf);
+    const entries = Object.keys(zip.files).filter(p => !zip.files[p].dir);
+    let rootPrefix = '';
+    if (entries.length > 0) { const si = entries[0].indexOf('/'); if (si > 0) rootPrefix = entries[0].substring(0, si + 1); }
+    let added = 0, skipped = 0;
+    for (let i = 0; i < entries.length; i++) {
+      const fullPath = entries[i];
+      const relPath = fullPath.startsWith(rootPrefix) ? fullPath.substring(rootPrefix.length) : fullPath;
+      if (!relPath) { skipped++; continue; }
+      try {
+        const entry = zip.files[fullPath];
+        const buf = await entry.async('arraybuffer');
+        if (buf.byteLength > MAX_EXTRACT_SIZE) { skipped++; continue; }
+        const blob = new Blob([buf], { type: mimeOf(relPath) });
+        const file = new File([blob], relPath, { lastModified: Date.now() });
+        if (!localFiles.some(x => x.name === relPath)) {
+          localFiles.push({ file, name: relPath, size: buf.byteLength, isBinary: isBin(relPath), checked: !isBin(relPath) });
+          added++;
+        }
+      } catch(_) { skipped++; }
+      progressFill.style.width = `${30 + Math.round((i+1)/entries.length*65)}%`;
+    }
+    progressBar.style.display = 'none';
+    showStatus(`✅ Zip extracted: ${added} files added${skipped ? `, ${skipped} skipped` : ''}`, 'success');
+  } catch(e) {
+    document.getElementById('zipExtractProgress').style.display = 'none';
+    showStatus('❌ Zip extraction failed: ' + e.message, 'error');
+  }
+}
 
 function renderLocal() {
-  if (!localFiles.length) { document.getElementById('localSortControls').style.display = 'none'; document.getElementById('localSelectActions').style.display = 'none'; document.getElementById('mergeLocalRow').style.display = 'none'; document.getElementById('localFileList').innerHTML=''; return; }
-  document.getElementById('localSortControls').style.display = 'flex'; document.getElementById('localSelectActions').style.display = 'flex'; document.getElementById('mergeLocalRow').style.display = 'block';
-  const el = document.getElementById('localFileList');
-  el.innerHTML = localFiles.map((f, i) => `
+  if(!localFiles.length){document.getElementById('localSortControls').style.display='none';document.getElementById('localSelectActions').style.display='none';document.getElementById('mergeLocalRow').style.display='none';document.getElementById('localFileList').innerHTML='';return;}
+  document.getElementById('localSortControls').style.display='flex';document.getElementById('localSelectActions').style.display='flex';document.getElementById('mergeLocalRow').style.display='block';
+  const el=document.getElementById('localFileList');
+  el.innerHTML=localFiles.map((f,i)=>`
     <div class="file-item" data-idx="${i}">
-      <span class="drag-handle" title="Drag" draggable="true">⠿</span>
-      <button class="order-btn" data-move="up" data-idx="${i}" ${i===0?'disabled':''}>↑</button>
-      <button class="order-btn" data-move="down" data-idx="${i}" ${i===localFiles.length-1?'disabled':''}>↓</button>
-      <input type="checkbox" class="local-cb" data-idx="${i}" ${f.checked ? 'checked' : ''}>
+      <div class="file-controls">
+        <span class="drag-handle" title="Drag to reorder" draggable="true">⠿</span>
+        <button class="order-btn" data-move="up" data-idx="${i}" ${i===0?'disabled':''}>↑</button>
+        <button class="order-btn" data-move="down" data-idx="${i}" ${i===localFiles.length-1?'disabled':''}>↓</button>
+        <input type="checkbox" class="file-checkbox local-cb" data-idx="${i}" ${f.checked?'checked':''}>
+      </div>
       <span class="file-path">${f.name}</span>
-      <span class="file-size">${fmtSize(f.size)}</span>
-      <span class="badge ${f.isBinary ? 'badge-bin' : 'badge-text'}">${f.isBinary ? 'BIN' : 'TXT'}</span>
-      <button class="remove-btn" data-idx="${i}">✕</button>
+      <div class="file-meta"><span class="file-size">${fmtSize(f.size)}</span><span class="badge ${f.isBinary?'badge-bin':'badge-text'}">${f.isBinary?'BIN':'TXT'}</span><button class="remove-btn" data-idx="${i}">✕</button></div>
     </div>`).join('');
-  enableDragSort(el, (from, to) => { const m = localFiles.splice(from, 1)[0]; localFiles.splice(to, 0, m); renderLocal(); });
-  el.querySelectorAll('.local-cb').forEach(cb => cb.onchange = () => { localFiles[parseInt(cb.dataset.idx)].checked = cb.checked; updateLocalCount(); });
-  el.querySelectorAll('.remove-btn').forEach(btn => btn.onclick = () => { localFiles.splice(parseInt(btn.dataset.idx), 1); renderLocal(); });
+  enableDragSort(el,(from,to)=>{const m=localFiles.splice(from,1)[0];localFiles.splice(to,0,m);renderLocal();});
+  el.querySelectorAll('.local-cb').forEach(cb=>cb.onchange=()=>{localFiles[parseInt(cb.dataset.idx)].checked=cb.checked;updateLocalCount();});
+  el.querySelectorAll('.remove-btn').forEach(btn=>btn.onclick=()=>{localFiles.splice(parseInt(btn.dataset.idx),1);renderLocal();});
   updateLocalCount();
 }
-function updateLocalCount() { document.getElementById('localFileCount').textContent = `${localFiles.filter(f=>f.checked).length}/${localFiles.length}`; document.getElementById('localMergeCount').textContent = `${localFiles.filter(f=>f.checked).length} selected`; }
-document.getElementById('localSortBy').onchange = e => { const v = e.target.value; if (v==='custom') return; localFiles.sort((a,b) => v.includes('asc') ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)); renderLocal(); };
-document.getElementById('localSelAll').onclick = () => { localFiles.forEach(f=>f.checked=true); renderLocal(); };
-document.getElementById('localSelNone').onclick = () => { localFiles.forEach(f=>f.checked=false); renderLocal(); };
-document.getElementById('localSelText').onclick = () => { localFiles.forEach(f=>f.checked=!f.isBinary); renderLocal(); };
-document.getElementById('localSelBin').onclick = () => { localFiles.forEach(f=>f.checked=true); renderLocal(); };
-document.getElementById('localClearAll').onclick = () => { localFiles=[]; renderLocal(); };
+function updateLocalCount(){document.getElementById('localFileCount').textContent=`${localFiles.filter(f=>f.checked).length}/${localFiles.length}`;document.getElementById('localMergeCount').textContent=`${localFiles.filter(f=>f.checked).length} selected`;}
+document.getElementById('localSortBy').onchange=e=>{const v=e.target.value;if(v==='custom')return;localFiles.sort((a,b)=>v.includes('asc')?a.name.localeCompare(b.name):b.name.localeCompare(a.name));renderLocal();};
+document.getElementById('localSelAll').onclick=()=>{localFiles.forEach(f=>f.checked=true);renderLocal();};
+document.getElementById('localSelNone').onclick=()=>{localFiles.forEach(f=>f.checked=false);renderLocal();};
+document.getElementById('localSelText').onclick=()=>{localFiles.forEach(f=>f.checked=!f.isBinary);renderLocal();};
+document.getElementById('localSelBin').onclick=()=>{localFiles.forEach(f=>f.checked=true);renderLocal();};
+document.getElementById('localClearAll').onclick=()=>{localFiles=[];renderLocal();};
 
-document.getElementById('mergeLocalBtn').onclick = async () => {
-  const sel = localFiles.filter(f => f.checked); if (!sel.length) return showStatus('Select files', 'error');
-  const mode = document.getElementById('localBinaryMode').value;
-  preview.textContent = 'Reading…'; showStatus(`Reading ${sel.length}…`, 'loading'); mergedText = '';
-  for (const f of sel) {
-    if (f.isBinary) { if (mode === 'skip') mergedText += `\n\n/* ===== ${f.name} — SKIPPED ===== */\n`; else if (mode === 'stub') mergedText += `\n\n/* ===== ${f.name} (BINARY — skipped, ${fmtSize(f.size)}) ===== */\n/* [Not included] */\n`; else { const b64 = await new Promise(r => { const rd = new FileReader(); rd.onload = () => r(rd.result.split(',')[1]); rd.readAsDataURL(f.file); }); mergedText += `\n\n/* ===== ${f.name} (BINARY, base64, ${fmtSize(f.size)}) ===== */\n${wrapB64(b64)}\n`; } }
-    else { mergedText += `\n\n/* ===== ${f.name} ===== */\n\n${await f.file.text()}`; }
+document.getElementById('mergeLocalBtn').onclick=async()=>{
+  const sel=localFiles.filter(f=>f.checked);if(!sel.length)return showStatus('Select files','error');
+  const mode=document.getElementById('localBinaryMode').value;
+  preview.textContent='Reading…';showStatus(`Reading ${sel.length}…`,'loading');mergedText='';
+  let ok=0,fail=0;const logEntries=[];
+  for(const f of sel){
+    try{
+      if(f.isBinary){
+        if(mode==='skip'){mergedText+=`\n\n/* ===== ${f.name} — SKIPPED ===== */\n`;ok++;logEntries.push({path:f.name,ok:true,size:f.size,isBinary:true});}
+        else if(mode==='stub'){mergedText+=`\n\n/* ===== ${f.name} (BINARY — skipped, ${fmtSize(f.size)}) ===== */\n/* [Not included] */\n`;ok++;logEntries.push({path:f.name,ok:true,size:f.size,isBinary:true});}
+        else{const b64=await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result.split(',')[1]);rd.readAsDataURL(f.file);});mergedText+=`\n\n/* ===== ${f.name} (BINARY, base64, ${fmtSize(f.size)}) ===== */\n${wrapB64(b64)}\n`;ok++;logEntries.push({path:f.name,ok:true,size:f.size,mime:mimeOf(f.name),isBinary:true});}
+      }else{
+        const text=await f.file.text();
+        mergedText+=`\n\n/* ===== ${f.name} ===== */\n\n${text}`;
+        ok++;logEntries.push({path:f.name,ok:true,size:f.size,mime:mimeOf(f.name),isBinary:false});
+      }
+    }catch(e){mergedText+=`\n\n/* ===== ${f.name} ===== */\n/* FAILED: ${e.message} */\n`;fail++;logEntries.push({path:f.name,ok:false,size:f.size,error:e.message,isBinary:f.isBinary});}
   }
-  preview.textContent = mergedText; document.getElementById('outputSize').textContent = fmtSize(new Blob([mergedText]).size); showStatus('✅ Done', 'success');
+  preview.textContent=mergedText;document.getElementById('outputSize').textContent=fmtSize(new Blob([mergedText]).size);
+  generateLog(logEntries,'Local Files / Zip Extract');
+  showStatus(`✅ ${ok} merged, ❌ ${fail} failed`,fail?'error':'success');
 };
 
-// ===================== COPY / DOWNLOAD =====================
-document.getElementById('copyBtn').onclick = async () => { if (!mergedText) return; await navigator.clipboard.writeText(mergedText); showStatus('📋 Copied', 'success'); };
-document.getElementById('downloadBtn').onclick = () => { if (!mergedText) return; const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([mergedText], {type:'text/plain'})); a.download = document.getElementById('filename').value || 'merged.txt'; a.click(); };
+// ===================== COPY / DOWNLOAD / LOG =====================
+document.getElementById('copyBtn').onclick=()=>copyToClipboard(mergedText);
+document.getElementById('downloadBtn').onclick=()=>{if(!mergedText)return;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([mergedText],{type:'text/plain'}));a.download=document.getElementById('filename').value||'merged.txt';a.click();};
+document.getElementById('saveLogBtn').onclick=()=>{if(!currentLog)return;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([currentLog],{type:'text/plain'}));const ts=new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');a.download=`merge-log-${ts}.txt`;a.click();};
 </script>
 </body>
- </html>
+</html>
