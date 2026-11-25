@@ -52,6 +52,7 @@
   .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 99px; font-size: 0.67rem; font-weight: 600; letter-spacing: 0.03em; }
   .badge-text { background: #dbeafe; color: #1e40af; }
   .badge-bin { background: #fee2e2; color: #991b1b; }
+  .badge-cached { background: #d1fae5; color: #065f46; }
   @media (max-width: 600px) {
     .file-item { flex-wrap: wrap; padding: 0.6rem; }
     .file-path { width: 100%; order: 3; margin-top: 0.3rem; padding-left: 0; font-size: 0.78rem; }
@@ -78,13 +79,14 @@
   .progress-bar { width: 100%; height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden; margin-top: 0.5rem; display: none; }
   .progress-bar-fill { height: 100%; background: #2563eb; width: 0%; transition: width 0.3s; }
   .progress-bar-fill.zip { background: #059669; }
-  .zip-toolbar { display: none; align-items: center; gap: 0.5rem; margin-top: 0.5rem; padding: 0.5rem 0.7rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; font-size: 0.8rem; }
-  .zip-toolbar.show { display: flex; flex-wrap: wrap; }
+  .fetch-progress-text { font-size: 0.78rem; color: #374151; margin-top: 0.3rem; }
+  .zip-toolbar { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; padding: 0.5rem 0.7rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; font-size: 0.8rem; flex-wrap: wrap; }
   .zip-toolbar .hint { margin: 0; color: #166534; }
 </style>
 </head>
 <body>
 <div class="container">
+<textarea id="hiddenCopyArea" readonly style="position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none;"></textarea>
 <h1>📎 Merge Files — URLs, GitHub Repos & Local</h1>
 <div class="mode-tabs">
   <div class="mode-tab active" data-mode="urls">🔗 URL List</div>
@@ -105,10 +107,12 @@
     </select>
   </div>
   <button id="mergeUrlsBtn">Fetch & Merge</button>
+  <div class="progress-bar" id="urlFetchProgress" style="display:none"><div class="progress-bar-fill" id="urlFetchProgressFill"></div></div>
+  <div class="fetch-progress-text" id="urlFetchProgressText"></div>
   <div class="url-list-section" id="urlListSection" style="display:none">
     <div class="sort-controls"><span class="hint">Drag ⠿ or use ↑↓ to reorder:</span></div>
     <div class="file-list" id="urlOrderList"></div>
-    <div class="row"><button id="remixUrlBtn" class="secondary">🔄 Re-merge in Order</button></div>
+    <div class="row"><button id="remixUrlBtn" class="secondary">🔄 Re-merge in Order</button><button id="retryFailedBtn" class="secondary" style="display:none">🔄 Retry Failed</button></div>
   </div>
 </div>
 
@@ -116,7 +120,7 @@
 <div class="panel" id="panel-repo">
   <div class="row"><label>GitHub Repository URL</label>
     <input type="text" id="repoUrl" placeholder="https://github.com/owner/repo or .../tree/v1.0.0 or .../commit/abc123">
-    <div class="hint">Supports: root, <code>/tree/&lt;branch|tag&gt;</code>, <code>/commit/&lt;sha&gt;</code></div>
+    <div class="hint">Supports: root, <code>/tree/&lt;branch|tag&gt;</code>, <code>/blob/&lt;branch&gt;/...</code>, <code>/commit/&lt;sha&gt;</code></div>
   </div>
   <div class="controls row">
     <label>Max KB: <input type="number" id="maxKb" value="500" min="1"></label>
@@ -131,9 +135,8 @@
   </div>
   <button id="loadRepoBtn">Load Repo Files</button>
 
-  <!-- ZIP toolbar: appears after repo loads -->
   <div class="zip-toolbar" id="zipToolbar">
-    <span class="hint">📦 Large repo? Download the full archive:</span>
+    <span class="hint">📦 Download full archive instantly:</span>
     <button class="zip-dl-btn" id="downloadZipBtn">⬇️ Download Repo Zip</button>
     <span class="hint">then switch to <a onclick="document.querySelectorAll('.mode-tab')[2].click()">Local Files</a> and upload it there.</span>
   </div>
@@ -159,6 +162,8 @@
     <div class="merge-btn-row">
       <button id="mergeRepoBtn">Merge Selected (per-file)</button>
     </div>
+    <div class="progress-bar" id="repoFetchProgress" style="display:none"><div class="progress-bar-fill" id="repoFetchProgressFill"></div></div>
+    <div class="fetch-progress-text" id="repoFetchProgressText"></div>
     <div class="hint" id="repoFileCount" style="margin-top:0.5rem"></div>
   </div>
 </div>
@@ -215,15 +220,46 @@
 
 <script>
 // ===================== CONSTANTS & STATE =====================
-const MAX_EXTRACT_SIZE = 2 * 1024 * 1024; // 2 MB per file — zip-bomb guard
+const MAX_EXTRACT_SIZE = 2 * 1024 * 1024;
 const BINARY_EXT = /\.(png|jpe?g|gif|webp|ico|svg|pdf|zip|gz|tar|tgz|rar|7z|woff2?|ttf|eot|otf|mp3|mp4|webm|wasm|so|dll|exe|bin|lock|min\.js|min\.css|map)$/i;
 const BINARY_DIRS = /(^|\/)(node_modules|\.git|dist|build|\.next|coverage|vendor|\.idea|\.vscode)(\/|$)/i;
 const statusEl = document.getElementById('status'), preview = document.getElementById('preview');
+
+// Fetch cache — keyed by URL (raw URL for repo files, original URL for URL mode)
+const fetchCache = new Map();
+
 let currentLog = '', mergedText = '';
 let repoFiles = [], localFiles = [], urlData = [];
 let repoMeta = { owner: '', repo: '', ref: '', archiveRef: '' };
 
-// ===================== LAZY JSZIP LOADER =====================
+// ===================== SAVEAS (exact from working site) =====================
+function saveAs(content, fileName) {
+    const anchor = document.createElement("a");
+    const isBlob = content.toString().indexOf("Blob") > -1;
+    let url = content;
+    if (isBlob) {
+        url = window.URL.createObjectURL(content);
+    }
+    anchor.href = url;
+    anchor.download = fileName;
+    anchor.click();
+    if (isBlob) {
+        window.URL.revokeObjectURL(url);
+    }
+}
+
+// ===================== ZIPBALL HELPERS (exact from working site) =====================
+function getUserRepoZip(username, repository) {
+    const url = `https://api.github.com/repos/${username}/${repository}/zipball`;
+    return url;
+}
+
+function downloadUserRepo(username, repository) {
+    var url = getUserRepoZip(username, repository);
+    saveAs(url, repository + '.zip');
+}
+
+// ===================== LAZY JSZIP LOADER (only when .zip uploaded) =====================
 function loadJSZip() {
   return new Promise((resolve, reject) => {
     if (window.JSZip) { resolve(window.JSZip); return; }
@@ -242,7 +278,7 @@ function clearStatus() { statusEl.style.display = 'none'; }
 function fmtSize(b) { return !b && b !== 0 ? '' : b < 1024 ? b + ' B' : b < 1048576 ? (b/1024).toFixed(1)+' KB' : (b/1048576).toFixed(2)+' MB'; }
 function isBin(p) { return BINARY_EXT.test(p) || BINARY_DIRS.test(p); }
 function mimeOf(p) { const e = p.split('.').pop().toLowerCase(); return ({png:'image/png',jpg:'image/jpeg',gif:'image/gif',pdf:'application/pdf',zip:'application/zip',wasm:'application/wasm'})[e] || 'application/octet-stream'; }
-function toRaw(u) { try { const url = new URL(u.trim()); if (url.hostname === 'raw.githubusercontent.com') return url.toString().split('#')[0]; if (url.hostname === 'github.com') { const p = url.pathname.split('/').filter(Boolean); if (p[2] === 'blob' && p.length >= 5) return `https://raw.githubusercontent.com/${p[0]}/${p[1]}/${p[3]}/${p.slice(4).join('/')}`; } } catch(_){} return u.trim(); }
+function toRaw(u) { try { const url = new URL(u.trim()); if (url.hostname === 'raw.githubusercontent.com') return url.toString().split('#')[0]; if (url.hostname === 'github.com') { const p = url.pathname.split('/').filter(Boolean); if ((p[2] === 'blob' || p[2] === 'tree') && p.length >= 5) return `https://raw.githubusercontent.com/${p[0]}/${p[1]}/${p[3]}/${p.slice(4).join('/')}`; } } catch(_){} return u.trim(); }
 function arrToB64(buf) { const b = new Uint8Array(buf); let s = ''; for (let i = 0; i < b.length; i += 8192) s += String.fromCharCode(...b.slice(i, i+8192)); return btoa(s); }
 function wrapB64(s) { return s.length > 500 ? s.match(/.{1,76}/g).join('\n') : s; }
 function binEntry(path, size, mime, b64, mode) {
@@ -251,20 +287,82 @@ function binEntry(path, size, mime, b64, mode) {
   return `\n\n/* ===== ${path} (BINARY, base64, ${fmtSize(size)}, ${mime}) ===== */\n${wrapB64(b64)}\n`;
 }
 
+// ===================== FETCH WITH CACHE =====================
+async function fetchWithCache(rawUrl, meta) {
+  // Check cache first
+  if (fetchCache.has(rawUrl)) {
+    const cached = fetchCache.get(rawUrl);
+    if (cached.ok) {
+      // Return cached copy, mark as cached
+      return { ...cached, fromCache: true };
+    }
+    // If cached but failed, re-fetch (retry)
+  }
+  
+  // Not in cache or previously failed — fetch
+  const result = { ok: false, isBinary: false, size: 0, mime: '', content: null, error: null, fromCache: false };
+  try {
+    const res = await fetch(rawUrl, { signal: AbortSignal.timeout(15000) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const ct = res.headers.get('content-type') || '';
+    const buf = await res.arrayBuffer();
+    result.size = buf.byteLength;
+    result.mime = mimeOf(meta.path || meta.original || rawUrl);
+    result.isBinary = isBin(meta.path || meta.original || rawUrl) || /image|octet|pdf|zip/.test(ct);
+    if (result.isBinary && meta.mode !== 'base64') {
+      result.ok = true;
+    } else if (result.isBinary) {
+      result.content = arrToB64(buf);
+      result.ok = true;
+    } else {
+      result.content = new TextDecoder().decode(buf);
+      result.ok = true;
+    }
+  } catch (e) {
+    result.error = e.message;
+  }
+  
+  // Store in cache (even failures, so we don't retry immediately unless user clicks retry)
+  fetchCache.set(rawUrl, { ...result });
+  return result;
+}
+
 async function copyToClipboard(text) {
   if (!text) return;
-  let success = false;
+  
+  // Try modern clipboard API first (no DOM manipulation, no flicker)
   if (navigator.clipboard && window.isSecureContext) {
-    try { await navigator.clipboard.writeText(text); success = true; } catch(e) {}
-  }
-  if (!success) {
     try {
-      const ta = document.createElement('textarea');
-      ta.value = text; ta.style.cssText = 'position:fixed;opacity:0;left:-9999px;top:0';
-      document.body.appendChild(ta); ta.focus(); ta.select(); ta.setSelectionRange(0, text.length);
-      success = document.execCommand('copy'); document.body.removeChild(ta);
-    } catch(e) {}
+      await navigator.clipboard.writeText(text);
+      showStatus('📋 Copied to clipboard', 'success');
+      return;
+    } catch(e) { /* fall through to textarea method */ }
   }
+  
+  // Fallback: use persistent hidden textarea (no add/remove, no scroll jump)
+  const ta = document.getElementById('hiddenCopyArea');
+  ta.value = text;
+  
+  // Save scroll position
+  const scrollX = window.scrollX, scrollY = window.scrollY;
+  
+  // Select without focusing (works in most browsers)
+  ta.focus({ preventScroll: true });
+  ta.select();
+  ta.setSelectionRange(0, text.length);
+  
+  let success = false;
+  try {
+    success = document.execCommand('copy');
+  } catch(e) {}
+  
+  // Restore scroll position (prevents jump)
+  window.scrollTo(scrollX, scrollY);
+  ta.blur();
+  
+  // Clear the textarea (security hygiene)
+  ta.value = '';
+  
   showStatus(success ? '📋 Copied to clipboard' : '❌ Copy failed — please select & copy manually', success ? 'success' : 'error');
 }
 
@@ -316,6 +414,9 @@ document.querySelectorAll('.mode-tab').forEach(t => t.onclick = () => {
 // ===================== URL MODE =====================
 function renderUrlList() {
   const el = document.getElementById('urlOrderList');
+  const hasFailed = urlData.some(u => !u.ok);
+  document.getElementById('retryFailedBtn').style.display = hasFailed ? 'inline-block' : 'none';
+  
   el.innerHTML = urlData.map((u, i) => `
     <div class="file-item" data-idx="${i}">
       <div class="file-controls">
@@ -325,7 +426,7 @@ function renderUrlList() {
         <input type="checkbox" class="file-checkbox url-cb" data-idx="${i}" ${u.checked ? 'checked' : ''}>
       </div>
       <span class="file-path">${u.original}</span>
-      <div class="file-meta"><span class="file-size">${fmtSize(u.size)}</span><span class="badge ${u.isBinary?'badge-bin':'badge-text'}">${u.isBinary?'BIN':'TXT'}</span></div>
+      <div class="file-meta"><span class="file-size">${fmtSize(u.size)}</span><span class="badge ${u.isBinary?'badge-bin': u.fromCache ? 'badge-cached' : 'badge-text'}">${u.isBinary?'BIN':u.fromCache?'CACHED':'TXT'}</span></div>
     </div>`).join('');
   enableDragSort(el, (from, to) => { const m = urlData.splice(from,1)[0]; urlData.splice(to,0,m); renderUrlList(); });
   el.querySelectorAll('.url-cb').forEach(cb => cb.onchange = () => { urlData[parseInt(cb.dataset.idx)].checked = cb.checked; });
@@ -334,7 +435,7 @@ function buildUrlMerge() {
   const mode = document.getElementById('urlBinaryMode').value;
   mergedText = ''; let ok = 0, fail = 0; const logEntries = [];
   urlData.filter(u=>u.checked).forEach(u => {
-    if (!u.ok) { mergedText += `\n\n/* ===== ${u.original} ===== */\n/* FAILED */\n`; fail++; logEntries.push({path:u.original,ok:false,size:u.size,error:u.error,isBinary:u.isBinary}); }
+    if (!u.ok) { mergedText += `\n\n/* ===== ${u.original} ===== */\n/* FAILED: ${u.error} */\n`; fail++; logEntries.push({path:u.original,ok:false,size:u.size,error:u.error,isBinary:u.isBinary}); }
     else if (u.isBinary) { mergedText += binEntry(u.original,u.size,u.mime,u.content,mode); ok++; logEntries.push({path:u.original,ok:true,size:u.size,mime:u.mime,isBinary:true}); }
     else { mergedText += `\n\n/* ===== ${u.original} ===== */\n\n${u.content}`; ok++; logEntries.push({path:u.original,ok:true,size:u.size,mime:u.mime,isBinary:false}); }
   });
@@ -347,27 +448,71 @@ document.getElementById('mergeUrlsBtn').onclick = async () => {
   const inputs = document.getElementById('urls').value.split('\n').map(s=>s.trim()).filter(Boolean);
   if (!inputs.length) return showStatus('Enter URLs','error');
   const mode = document.getElementById('urlBinaryMode').value;
-  urlData = inputs.map(u=>({original:u,raw:toRaw(u),ok:false,isBinary:false,size:0,mime:'',content:null,checked:true}));
-  preview.textContent='Loading…'; showStatus(`Fetching ${inputs.length}…`,'loading');
-  for (let i=0;i<urlData.length;i++) {
-    const u=urlData[i];
-    try {
-      const res=await fetch(u.raw,{signal:AbortSignal.timeout(15000)});
-      if(!res.ok)throw new Error('HTTP '+res.status);
-      const ct=res.headers.get('content-type')||'';
-      const buf=await res.arrayBuffer();
-      u.size=buf.byteLength; u.mime=mimeOf(u.original);
-      u.isBinary=isBin(u.original)||/image|octet|pdf|zip/.test(ct);
-      if(u.isBinary&&mode!=='base64'){u.ok=true;}
-      else if(u.isBinary){u.content=arrToB64(buf);u.ok=true;}
-      else{u.content=new TextDecoder().decode(buf);u.ok=true;}
-    }catch(e){u.error=e.message;}
+  
+  // Build urlData, reusing cache for already-fetched URLs
+  urlData = inputs.map(u => {
+    const raw = toRaw(u);
+    if (fetchCache.has(raw)) {
+      const cached = fetchCache.get(raw);
+      if (cached.ok) {
+        return { original: u, raw, ...cached, fromCache: true, checked: true };
+      }
+    }
+    return { original: u, raw, ok: false, isBinary: false, size: 0, mime: '', content: null, checked: true, fromCache: false };
+  });
+  
+  // Count how many need fetching
+  const needFetch = urlData.filter(u => !u.fromCache);
+  
+  if (needFetch.length === 0) {
+    // All cached, just merge
+    document.getElementById('urlListSection').style.display='block';
+    renderUrlList(); buildUrlMerge();
+    showStatus(`✅ All ${urlData.length} files from cache, merged instantly`,'success');
+    return;
   }
+  
+  // Progress bar setup
+  const progBar = document.getElementById('urlFetchProgress');
+  const progFill = document.getElementById('urlFetchProgressFill');
+  const progText = document.getElementById('urlFetchProgressText');
+  progBar.style.display = 'block';
+  progFill.style.width = '0%';
+  
+  preview.textContent='Loading…'; showStatus(`Fetching ${needFetch.length} new, ${urlData.length - needFetch.length} cached…`,'loading');
+  
+  let fetched = 0;
+  for (let i=0;i<urlData.length;i++) {
+    const u = urlData[i];
+    if (u.fromCache) {
+      // Already have it, skip
+      continue;
+    }
+    
+    const result = await fetchWithCache(u.raw, { original: u.original, mode });
+    Object.assign(u, result);
+    
+    fetched++;
+    progFill.style.width = `${(fetched / needFetch.length) * 100}%`;
+    progText.textContent = `Fetching ${fetched} / ${needFetch.length}…`;
+  }
+  
+  progBar.style.display = 'none';
+  progText.textContent = '';
+  
   document.getElementById('urlListSection').style.display='block';
   renderUrlList(); buildUrlMerge();
-  const okc=urlData.filter(u=>u.ok).length;
-  showStatus(`✅ ${okc}/${urlData.length} fetched, ❌ ${urlData.length-okc} failed`,okc===urlData.length?'success':'error');
+  const okc = urlData.filter(u=>u.ok).length;
+  showStatus(`✅ ${okc}/${urlData.length} ready (${fetched} fetched, ${urlData.length - fetched} cached), ❌ ${urlData.length-okc} failed`,okc===urlData.length?'success':'error');
 };
+
+document.getElementById('retryFailedBtn').onclick = async () => {
+  // Clear cache entries for failed files
+  urlData.filter(u => !u.ok).forEach(u => fetchCache.delete(u.raw));
+  // Re-run merge
+  document.getElementById('mergeUrlsBtn').click();
+};
+
 document.getElementById('remixUrlBtn').onclick=buildUrlMerge;
 document.getElementById('urlBinaryMode').onchange=()=>{if(urlData.length)buildUrlMerge();};
 
@@ -383,7 +528,7 @@ function renderRepoList() {
         <input type="checkbox" class="file-checkbox repo-cb" data-idx="${i}" ${f.checked?'checked':''}>
       </div>
       <span class="file-path">${f.path}</span>
-      <div class="file-meta"><span class="file-size">${fmtSize(f.size)}</span><span class="badge ${f.isBinary?'badge-bin':'badge-text'}">${f.isBinary?'BIN':'TXT'}</span></div>
+      <div class="file-meta"><span class="file-size">${fmtSize(f.size)}</span><span class="badge ${f.isBinary?'badge-bin': f.fromCache ? 'badge-cached' : 'badge-text'}">${f.isBinary?'BIN':f.fromCache?'CACHED':'TXT'}</span></div>
     </div>`).join('');
   enableDragSort(el,(from,to)=>{const m=repoFiles.splice(from,1)[0];repoFiles.splice(to,0,m);renderRepoList();});
   el.querySelectorAll('.repo-cb').forEach(cb=>cb.onchange=()=>{repoFiles[parseInt(cb.dataset.idx)].checked=cb.checked;updateRepoCount();});
@@ -400,10 +545,9 @@ document.getElementById('loadRepoBtn').onclick=async()=>{
     const url=new URL(input);
     const p=url.pathname.split('/').filter(Boolean);
     owner=p[0];repo=p[1].replace(/\.git$/,'');
-    if(p[2]==='tree'&&p[3])ref=p[3];
+    if(p[2]==='blob'&&p[3])ref=p[3];
+    else if(p[2]==='tree'&&p[3])ref=p[3];
     else if(p[2]==='commit'&&p[3])ref=p[3];
-    else if(p[2]==='archive'&&p[4]==='tags'&&p[5])ref=p[5];
-    else if(p[2]==='archive'&&p[4]==='heads'&&p[5])ref=p[5];
   }catch(e){return showStatus('Invalid URL','error');}
   showStatus('Loading…','loading');
   try{
@@ -420,12 +564,11 @@ document.getElementById('loadRepoBtn').onclick=async()=>{
     if(tree.message)throw new Error(tree.message);
     const maxB=(parseInt(document.getElementById('maxKb').value)||500)*1024;
     const skipBin=document.getElementById('skipBinaries').checked;
-    repoFiles=(tree.tree||[]).filter(n=>n.type==='blob'&&(n.size||0)<=maxB).map(n=>({path:n.path,raw:`https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${encodeURI(n.path)}`,size:n.size,isBinary:isBin(n.path),checked:!isBin(n.path)||!skipBin}));
+    repoFiles=(tree.tree||[]).filter(n=>n.type==='blob'&&(n.size||0)<=maxB).map(n=>({path:n.path,raw:`https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${encodeURI(n.path)}`,size:n.size,isBinary:isBin(n.path),checked:!isBin(n.path)||!skipBin,fromCache:false}));
     repoMeta={owner,repo,ref,archiveRef};
     document.getElementById('selectActions').style.display='flex';
     document.getElementById('repoSortControls').style.display='flex';
     document.getElementById('mergeRepoRow').style.display='block';
-    document.getElementById('zipToolbar').classList.add('show');
     renderRepoList();
     showStatus(`✅ ${repoFiles.length} files loaded (ref: ${archiveRef.substring(0,8)})`,'success');
   }catch(e){showStatus('❌ '+e.message,'error');}
@@ -437,39 +580,108 @@ document.getElementById('selNone').onclick=()=>{repoFiles.forEach(f=>f.checked=f
 document.getElementById('selText').onclick=()=>{repoFiles.forEach(f=>f.checked=!f.isBinary);renderRepoList();};
 document.getElementById('selBin').onclick=()=>{repoFiles.forEach(f=>f.checked=true);renderRepoList();};
 
-// --- Download Repo Zip button ---
+// --- Download Repo Zip (uses api.github.com zipball — exact match to working site) ---
 document.getElementById('downloadZipBtn').onclick = () => {
-  const { owner, repo, archiveRef } = repoMeta;
-  if (!owner || !repo) return showStatus('❌ Repo info missing. Load repo first.', 'error');
-  const zipUrl = `https://github.com/${owner}/${repo}/archive/${archiveRef}.zip`;
-  const a = document.createElement('a');
-  a.href = zipUrl;
-  a.download = `${repo}-${archiveRef.substring(0,8)}.zip`;
-  a.rel = 'noopener';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  showStatus('⬇️ Download started. After it finishes, switch to <b>Local Files</b> and upload the zip.', 'success');
+  const input = document.getElementById('repoUrl').value.trim();
+  if (!input) return showStatus('❌ Enter a repo URL first', 'error');
+  
+  let username, repository;
+  try {
+    const url = new URL(input);
+    const p = url.pathname.split('/').filter(Boolean);
+    username = p[0];
+    repository = p[1].replace(/\.git$/, '');
+  } catch(e) {
+    return showStatus('❌ Invalid URL', 'error');
+  }
+  
+  // Exact same logic as the working site
+  downloadUserRepo(username, repository);
+  showStatus('✅ Download started', 'success');
 };
 
+// --- Merge Repo (sequential with cache + progress) ---
 document.getElementById('mergeRepoBtn').onclick=async()=>{
   const sel=repoFiles.filter(f=>f.checked);if(!sel.length)return showStatus('Select files','error');
   const mode=document.getElementById('repoBinaryMode').value;
-  preview.textContent='Loading…';showStatus(`Fetching ${sel.length} files…`,'loading');mergedText='';
+  preview.textContent='Loading…';
+  
+  // Check cache for each selected file
+  let needFetch = 0;
+  sel.forEach(f => {
+    if (fetchCache.has(f.raw)) {
+      const cached = fetchCache.get(f.raw);
+      if (cached.ok) {
+        Object.assign(f, cached, { fromCache: true });
+      } else {
+        needFetch++;
+        f.fromCache = false;
+      }
+    } else {
+      needFetch++;
+      f.fromCache = false;
+    }
+  });
+  
+  const cachedCount = sel.length - needFetch;
+  if (needFetch === 0) {
+    // All cached, just merge
+    mergedText='';
+    let ok=0,fail=0;const logEntries=[];
+    for(const f of sel){
+      if(f.isBinary){mergedText+=binEntry(f.path,f.size,mimeOf(f.path),f.content,mode);}
+      else{mergedText+=`\n\n/* ===== ${f.path} ===== */\n\n${f.content}`;}
+      ok++;logEntries.push({path:f.path,ok:true,size:f.size,mime:mimeOf(f.path),isBinary:f.isBinary});
+    }
+    preview.textContent=mergedText;document.getElementById('outputSize').textContent=fmtSize(new Blob([mergedText]).size);
+    generateLog(logEntries,'GitHub Repo (per-file): '+document.getElementById('repoUrl').value);
+    showStatus(`✅ All ${sel.length} files from cache, merged instantly`,'success');
+    renderRepoList();
+    return;
+  }
+  
+  // Progress bar setup
+  const progBar = document.getElementById('repoFetchProgress');
+  const progFill = document.getElementById('repoFetchProgressFill');
+  const progText = document.getElementById('repoFetchProgressText');
+  progBar.style.display = 'block';
+  progFill.style.width = '0%';
+  progText.textContent = `Fetching ${needFetch} new, ${cachedCount} cached…`;
+  
+  showStatus(`Fetching ${needFetch} files (${cachedCount} cached)…`,'loading');
+  mergedText='';
   let ok=0,fail=0;const logEntries=[];
-  for(const f of sel){
+  let fetched=0;
+  for(let i=0; i<sel.length; i++){
+    const f = sel[i];
+    
+    if (f.fromCache) {
+      // Already have it
+      if(f.isBinary){mergedText+=binEntry(f.path,f.size,mimeOf(f.path),f.content,mode);}
+      else{mergedText+=`\n\n/* ===== ${f.path} ===== */\n\n${f.content}`;}
+      ok++;logEntries.push({path:f.path,ok:true,size:f.size,mime:mimeOf(f.path),isBinary:f.isBinary});
+      continue;
+    }
+    
     try{
-      const res=await fetch(f.raw,{signal:AbortSignal.timeout(15000)});
-      if(!res.ok)throw new Error('HTTP '+res.status);
-      const buf=await res.arrayBuffer();
-      if(f.isBinary){mergedText+=binEntry(f.path,f.size,mimeOf(f.path),arrToB64(buf),mode);}
-      else{mergedText+=`\n\n/* ===== ${f.path} ===== */\n\n${new TextDecoder().decode(buf)}`;}
+      const result = await fetchWithCache(f.raw, { path: f.path, mode });
+      Object.assign(f, result);
+      if(f.isBinary){mergedText+=binEntry(f.path,f.size,mimeOf(f.path),f.content,mode);}
+      else{mergedText+=`\n\n/* ===== ${f.path} ===== */\n\n${f.content}`;}
       ok++;logEntries.push({path:f.path,ok:true,size:f.size,mime:mimeOf(f.path),isBinary:f.isBinary});
     }catch(e){mergedText+=`\n\n/* ===== ${f.path} ===== */\n/* FAILED: ${e.message} */\n`;fail++;logEntries.push({path:f.path,ok:false,size:f.size,error:e.message,isBinary:f.isBinary});}
+    
+    fetched++;
+    progFill.style.width = `${(fetched / needFetch) * 100}%`;
+    progText.textContent = `Fetching ${fetched} / ${needFetch} — ${f.path.split('/').pop()}`;
   }
+  progBar.style.display = 'none';
+  progText.textContent = '';
+  
   preview.textContent=mergedText;document.getElementById('outputSize').textContent=fmtSize(new Blob([mergedText]).size);
   generateLog(logEntries,'GitHub Repo (per-file): '+document.getElementById('repoUrl').value);
-  showStatus(`✅ ${ok} merged, ❌ ${fail} failed`,fail?'error':'success');
+  showStatus(`✅ ${ok} merged (${fetched} fetched, ${cachedCount} cached), ❌ ${fail} failed`,fail?'error':'success');
+  renderRepoList();
 };
 
 // ===================== LOCAL MODE (with ZIP support) =====================
@@ -495,7 +707,7 @@ async function handleLocalFiles(files) {
 
 async function extractZipAndAdd(zipFile) {
   try {
-    const JSZip = await loadJSZip();
+    const JSZip = await loadJSZip();  // <-- lazy loaded only here
     const progressBar = document.getElementById('zipExtractProgress');
     const progressFill = document.getElementById('zipExtractProgressFill');
     progressBar.style.display = 'block'; progressFill.style.width = '10%';
@@ -585,8 +797,16 @@ document.getElementById('mergeLocalBtn').onclick=async()=>{
 
 // ===================== COPY / DOWNLOAD / LOG =====================
 document.getElementById('copyBtn').onclick=()=>copyToClipboard(mergedText);
-document.getElementById('downloadBtn').onclick=()=>{if(!mergedText)return;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([mergedText],{type:'text/plain'}));a.download=document.getElementById('filename').value||'merged.txt';a.click();};
-document.getElementById('saveLogBtn').onclick=()=>{if(!currentLog)return;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([currentLog],{type:'text/plain'}));const ts=new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');a.download=`merge-log-${ts}.txt`;a.click();};
+document.getElementById('downloadBtn').onclick=()=>{
+  if(!mergedText)return;
+  const blob = new Blob([mergedText], { type: 'text/plain' });
+  saveAs(blob, document.getElementById('filename').value || 'merged.txt');
+};
+document.getElementById('saveLogBtn').onclick=()=>{
+  if(!currentLog)return;
+  const blob = new Blob([currentLog], { type: 'text/plain' });
+  saveAs(blob, `merge-log-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.txt`);
+};
 </script>
 </body>
 </html>
